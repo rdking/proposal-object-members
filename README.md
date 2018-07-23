@@ -40,20 +40,11 @@ var example = {
   private privField2() {},
   private get privField3() {},
   private set privField3(value) {},
-  private static privStaticField1 = "value",
-  private static privStaticField2() {},
-  private static get privStaticField3() {},
-  private static set privStaticField3(value) {},
   protected protField1 = "value",
   protected protField2() {},
   protected get protField3() {},
   protected set protField3(value) {},
-  protected static protStaticField1 = "value",
-  protected static protStaticField2() {},
-  protected static get protStaticField3() {},
-  protected static set protStaticField3(value) {},
-  /* public */ field = "value", //Note: The public keyword is useless and not part of the proposal.
-  /* public */ static field = "value" //However, public data **is** part of the proposal.
+  /* public */ field = "value" //Note: The public keyword is useless and not part of the proposal.
 };
 ```
 

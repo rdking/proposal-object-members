@@ -124,7 +124,7 @@ const Example = (function() {
     }
   };
   
-  retval..[Symbol.Inheritance] = {
+  retval[Symbol.Inheritance] = {
     protNames: {
       field3
     },

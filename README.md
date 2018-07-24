@@ -33,7 +33,7 @@ class Example {
 }
 ```
 
-Since `class` **_is and must forever remain_** syntactic sugar, whatever you can do with a `class` must also be doable via a simple object factory. Therefore, I'm also proposing these possibilities:
+Since the debut of `class` in ES, it has always had the appearance of syntactic sugar within the version. There is nothing in ES6 that you can do with `class` that cannot be done without `class` in the same spec version. This was accomplished by ensuring there was a parallel API that allowed object factories to perform the same actions. To continue this tradition, I'm also proposing these possibilities:
 ```javascript
 var example = {
   private privField1 = "value",

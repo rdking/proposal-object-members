@@ -1,7 +1,7 @@
 # Object members proposal
 
 ## Goal
-ES, being a prototype based language, has matured to the point that it is being used to create full desktop and web applications. It now has support for the `class` keyword, making it far simpler to create object factory heirarchies. The main problem with this is that it currently doesn't support adding data, let alone private or protected data. Given that the intent of the `class` keyword was to create syntactic sugar around the well-documented process for creating object heirarchies via prototype inheritance, the absense of the ability to put data members into the `class` definition is sorely missed. Further, given that this data usually constitutes implementation details as opposed to being part of the public interface, and that some of these implementation details must be shared amongs descendant classes, there is a definite need for both `private` and `protected` members among the member data. That is what this proposal seeks to provide.
+ES, being a prototype based language, has matured to the point that it is being used to create full desktop and web applications. It now has support for the `class` keyword, making it far simpler to create object factory heirarchies. The main problem with this is that it currently doesn't support adding data, let alone private or protected data. Given that the intent of the `class` keyword was to create a simplified syntax for the well-documented process for creating object heirarchies via prototype inheritance, the absense of the ability to put data members into the `class` definition is sorely missed. Further, given that this data usually constitutes implementation details as opposed to being part of the public interface, and that some of these implementation details must be shared amongs descendant classes, there is a definite need for both `private` and `protected` members among the member data. That is what this proposal seeks to provide.
 
 ## Rationale
 One of the main reasons ES developers even bothered to construct their own class factories in ES5 was to hide implementation details from the users of their class factories. While the `_name` convention may have been nice, and sucessfully got many a programmer to respect functions and member data marked this way as private, it did nothing to stop many developers from ignoring the convention, creating software with various security/usability issues, unduely constraining the flexibility of the library developer, and, in some cases, damaging the reputation of the abused library.
@@ -33,7 +33,7 @@ class Example {
 }
 ```
 
-Since the debut of `class` in ES, it has always had the appearance of syntactic sugar within the version. There is nothing in ES6 that you can do with `class` that cannot be done without `class` in the same spec version. This was accomplished by ensuring there was a parallel API that allowed object factories to perform the same actions. To continue this tradition, I'm also proposing these possibilities:
+Since the debut of `class` in ES, there has also been an alternate way to perform the same actions. There is nothing in ES6 that you can do with `class` that cannot be done without `class` in the same spec version. This was accomplished by ensuring there was a parallel API that allowed object factories to perform the same actions. To continue this tradition, I'm also proposing these possibilities:
 ```javascript
 var example = {
   private privField1 = "value",

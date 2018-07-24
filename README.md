@@ -58,7 +58,7 @@ class Example {
   }
   
   static print(obj) {
-    console.log(`privField1 = ${obj#.["privField1"]}`);
+    console.log(`privField1 = ${obj#["privField1"]}`);
   }
 }
 ```
@@ -72,7 +72,7 @@ The right term for the `#` operator **must be an access operator**. This is crit
 #### The `private` and `protected` keywords
 These keywords declare `private` members in much the same way as you would expect if you were implementing `private` data using a `WeakMap`. A short example should make it clear.
 
-With this proposal's sugar:
+With this proposal's syntax:
 ```javascript
 class Example {
   private field1 = 'alpha';
@@ -89,12 +89,17 @@ class Example {
 }
 ```
 
-Sugar-free ES6:
+Loosely Translated to ES6:
 ```javascript
-Object.defineProperty(Symbol.Inheritance, {value: Symbol("Inheritance")});
-
-const Example = (function() {
+//Pre-defined globally
+const Class = (function() {
   const privMap = new WeakMap();
+  return function Class(fn) {
+    return fn(privMap);
+  }
+})();
+
+const Example = Class(function(privMap) {
   const field1 = Symbol("field1");
   const field2 = Symbol("field2");
   const field3 = Symbol("field3");
@@ -102,12 +107,15 @@ const Example = (function() {
   
   var retval = class Example {
     constructor() {
-      if (!new.target)
+      if (!new.target) {
         throw new TypeError("Constructor Example requires 'new'");
+      }
 
       //If Example extended something, super() would go here
       const __constructor_priv__ = privMap.get(this.constructor);
       privMap.set(this, Object.create(__constructor_priv__.privProto));
+
+      //Your "super()"-less constructor code here...
     }
   
     print() {
@@ -124,7 +132,7 @@ const Example = (function() {
     }
   };
   
-  retval[Symbol.Inheritance] = {
+  privMap.set(retval, {
     protNames: {
       field3
     },
@@ -139,12 +147,81 @@ const Example = (function() {
       [field2]: 0,
       [field4]: "You can see me!"
     }
-  };
-  
-  privMap.set(retval, retval.prototype.[Symbol.Inheritance]);
+  });
   
   return retval;
-})();
+});
+```
+
+If we were to inherit from the example above:
+```javascript
+class SubExample extends Example {
+  private field5 = "Hello from the SubExample!";
+  
+  constructor() {
+    super();
+  }
+  
+  print() {
+    super.print();
+    console.log(`field5 = ${this#.field5}`);
+  }
+}
+```
+it might roughly translate to the following:
+```javascript
+const SubExample = Class(function(privMap) {
+  if (!(privMap && privMap.has(SubExample))) {
+    throw new TypeError("Class extends value Example is not a constructor or null");
+  }
+  const field3 = privMap.get(SubExample).protNames.field3;
+  const field4 = privMap.get(SubExample).protStaticNames.field4;
+  const field5 = Symbol("field5");
+  
+  var retval = class SubExample extends Example {
+    constructor() {
+      if (!new.target) {
+        throw new TypeError("Constructor Example requires 'new'");
+      }
+      
+      var retval = Reflect.construct(Example, arguments, SubExample); // === super();
+      const __constructor_priv__ = privMap.get(retval.constructor);
+      privMap.set(retval, Object.create(__constructor_priv__.privProto));
+      
+      //Your "super()"-less constructor code here...
+      return retval;
+    }
+  
+    print() {
+      if (!privMap.has(this)) {
+        throw new TypeError("Function 'print' called without instance of 'Example' as the context");
+      }
+      
+      const __priv__ = privMap.get(this); 
+      const __constructor_priv__ = privMap.get(this.constructor);
+      Object.getPrototypeOf(Object.getPrototypeOf(this)).print.call(this);
+      console.log(`field5 = ${__priv__[field5]}`);
+    }
+  };
+  
+  privMap.set(retval, {
+    protNames: {
+      __proto__: privMap.get(SubExample).protNames
+    },
+    protStaticNames: {
+      __proto__: privMap.get(SubExample).protStaticNames
+    },
+    privProto: {
+      [field5]: "Hello from the SubExample!",
+      __proto__: privMap.get(SubExample).privProto
+    },
+    privStaticData: {
+      __proto__: privMap.get(SubExample).privStaticData
+    }
+  });
+  
+  return retval;
+});
 ```
 
 ## The odd bits...

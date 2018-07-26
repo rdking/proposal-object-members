@@ -36,19 +36,19 @@ class Example {
 Since the debut of `class` in ES, there has also been an alternate way to perform the same actions. There is nothing in ES6 that you can do with `class` that cannot be done without `class` in the same spec version. This was accomplished by ensuring there was a parallel API that allowed object factories to perform the same actions. To continue this tradition, I'm also proposing these possibilities:
 ```javascript
 var example = {
-  private privField1 = "value",
+  private privField1: "value",
   private privField2() {},
   private get privField3() {},
   private set privField3(value) {},
-  protected protField1 = "value",
+  protected protField1: "value",
   protected protField2() {},
   protected get protField3() {},
   protected set protField3(value) {},
-  /* public */ field = "value" //Note: The public keyword is useless and not part of the proposal.
+  /* public */ field: "value" //Note: The public keyword is useless and not part of the proposal.
 };
 ```
 
-Given the arguments that have led to [this other proposal](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
+Missing from the above function examples are the use of `async` and `*`(to define a generator). It is the intention of this proposal that these also be supported. The `private` and `protected` keywords are meant to provide a privilege level to any and all possible forms of member variable, property, and function declaration that make sense within a class or object. Given the arguments that have led to [this other proposal](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
 ```javascript
 class Example {
   private privField1 = "value";
@@ -223,6 +223,23 @@ const SubExample = Class(function(privMap) {
   return retval;
 });
 ```
+
+## Privileges for object declarations...
+The addition of `class` keyword also brought the `Reflect` API with it, ensuring that those who have the desire to avoid using the `class` keyword can do so without issue. It is the intention of this proposal that this ability be maintained even though the addition of privilege levels. This is done by allowing the new tokens (`private`, `protected`, & `#`) to be used in object literal declarations as shown in the notation example above. Because any member declared `private` or `protected` will not be publicly accessible on the object instance, any object containing such members must also contain 1 or more functions which, taken together, access all `private` and `protected` members. These functions must be declared within the scope of the object literal declaration.
+
+## Mutations to objects...
+Any function added to an object literal or a `class` prototype after the declaration will not have access to the `private` and `protected` members of the object literal or `class`. The reason for this can be seen by looking at the translated code in "The `private` and `protected` keywords..." section above. The result of a `private` or `protected` declaration is a `Symbol` that only exists within the scope of the corresponding object literal or `class` declaration. Functions declared later will not have access to these `Symbols`. Also, since these `Symbols` are not themselves part of the object literal or `class` declaration, there is no means of retrieving these `Symbols` via any object literal, `class` constructor, or `class` prototype.
+
+## Implementation details...
+Every object will contain 2 new slots: 
+* one for `private` values
+* one for declaration info
+
+The slot for `private` values will contain a single sealed record, the key/value pairs of which will be all of the `private` and `protected` symbols associated with the object and their corresponding default values as well as a `__proto__: null` pair. The slot for declaration info will contain a single sealed record, the key/value pairs of which are the declared `[[Identifier Name]]` and corresponding `Symbol` value of the `protected` members of the object as well as a `__proto__: null` pair. This serves as the list of inheritable names.
+
+The prototype resulting from a `class` declaration is no different. Neither is the resulting constructor function. When `private` and `protected` members are declared `static` in a `class`, their information is added to the afore mentioned slots of the generated constructor. If they are not declared `static`, their information is added to the afore mentioned slots of the generated prototype object. All key/value pairs added to the declaration info record of any object are added as read-only. All key/value pairs added to the `private` values record of a `class` prototype are added as read-only while those added to the constructor remain writable.
+
+The `private` values record of the constructor is used as the `private` and `protected` data for the `static` members of the `class` while the same record of the prototype is used as the `__proto__` value for the `private` values record of every instance object created by the corresponding constructor. When a `class` extends another, the `__proto__` field of both afore mentioned slots in both generated components of the newly derrived `class` is assigned a reference to the corresponding record of the base `class`. In this way, inheritance of the `protected` members of a `class` continues to follow the same prototypal paradigm already present in ES.
 
 ## The odd bits...
 There will be those who strongly disagree with the use of the `private` keyword without access notation that looks like `obj.field`. To them I say, "I agree. It doesn't feel quite right having that extra character in there." At the same time, I recognize that this is ES, which is a very different language than the ones from which we're borrowing the `class` concept. As such, we should be willing to expect some _reasonable_ concessions. I would rather concede the extra `#` in `obj#.field` for rational reasons like the need to not have private implementation details interfere with public interface mutation, than concede `private` in `private field` for emotional reasons like "it doesn't feel right".

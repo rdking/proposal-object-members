@@ -8,6 +8,27 @@ One of the main reasons ES developers even bothered to construct their own class
 
 This is the reason we need `private` and `protected`. Their existance will allow developers to properly hide what should be hidden from their users. For those who (quite rightly) think this will interfere with their ability to monkey patch code, you should really be filing feature requests and possibly code patches with the library developer to extend its usability and flexibility. Not only do you help the community by doing that, you also prevent yourself from getting "locked in" to a specific version of that library. Put another way, if you can monkey patch, you can submit a patch!
 
+## Existing proposals
+This proposal covers ground in ES for which there are already existing proposals, namely:
+* [proposal-static-class-features](https://github.com/tc39/proposal-static-class-features/)
+* [proposal-class-fields](https://github.com/tc39/proposal-class-fields)
+
+This proposal should be considered as inheriting the intent and some of the design of these pre-existing proposals. However, there are several critical differences between this proposal and the pre-existing proposals. These differences, I hope, will help to improve both the understanding and adoption of these features without unduely encumbering the language's optimizability or future extensibility. In the two subsections below, the phrase "existing proposal" refers to the proposal named in the section header.
+
+#### Compared to proposal-static-class-features...
+On its own, the existing proposal is virtually flawless. It provides exactly what one would expect from the syntax for a static class member. Wherein it allows for public `static` members to be added to a `class`, this proposal absorbs that functionality. However, the existing proposal is an extension of proposal-class-fields and inherits the issues therein. Unfortunately, the existing proposal lacks the ability to provide an equivalent of `static #field;` in a function. This will prevent developers from taking advantage of the benefits of the new notation to create object factories with private `static` data stored in the private data slot of the constructor function as would be done for the equivalent `class`. Also, due to the lack of a `protected` equivalent in proposal-class fields, there is no concept of a `protected static` declaration in the existing proposal. This proposal addresses both of these issues.
+
+#### Compared to proposal-class-fields...
+The sheer amount effort that has been put into the existing proposal is formidable. It would be ill-adivsed at best to ignore the years of contemplation and discourse that has been poured into it. It is for this reason that the many issues and pitfalls that have been skillfully avoided in the existing proposal have been absorbed into this proposal. However, the existing proposal is not without its issues.
+
+* The syntax, while ostensibly easy to understand is meeting with high resistance from many of those who are aware of and interested in affecting the proposal. See [issue #100](https://github.com/tc39/proposal-class-fields/issues/100)
+* The syntax of the existing proposal seems simple enough on the surface (just replace `_` with `#` and the language will do the rest). However, any attempt to understand the syntax leads to mental model conflicts that are inherent to the use of the syntax itself. See [the FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#but-doesnt-giving-thisx-and-thisx-different-semantics-break-an-invariant-of-current-syntax), [issue #104](https://github.com/tc39/proposal-class-fields/issues/104#issuecomment-396623715), [issue #77](https://github.com/tc39/proposal-class-fields/issues/77#issuecomment-360974968).
+* The syntax of the existing proposal limits the prescribed features to usage of the `class` keyword. This is not in keeping with the fact that all of the present functionality of the `class` keyword can be used in ES6 without using the `class` keyword. Likewise, there are those who would want to be able to use a feature like that provided by the existing proposal without being required to use the `class` keyword. See [issue #77](https://github.com/tc39/proposal-class-fields/issues/77#issuecomment-361016935).
+* The existing proposal refuses to use the `private` keyword for fear that it "implies that access would be done with `this.x`" ([FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#why-arent-declarations-private-x)). This implication does not make sense given the fact that you can [model encapsulation using WeakMaps](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#how-can-you-model-encapsulation-using-weakmaps), a well known technique that requires accessing a separate object to retrieve the private members, and given that the existing proposal _desugars to using WeakMaps_. If that is how the existing proposal is to be mentally modelled, then it should also be obvious that the private fields of a `class` cannot be accessed via `this.x`.
+* The syntax of the existing proposal breaks the common equality `this.x === this['x']` for private fields due to the fact that the `#` sigil is part of the `[[IdentifierName]]` of the private field. See [the FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#why-doesnt-thisx-access-the-private-field-named-x-given-that-thisx-does), [issue #74](https://github.com/tc39/proposal-class-fields/issues/74).
+
+This proposal addresses all 5 of these issues.
+
 ## Notation
 It's as simple as this, I want to add the following possibilites to ES:
 ```javascript
@@ -48,7 +69,7 @@ var example = {
 };
 ```
 
-To completely level the playing field, two more notation will be allowed:
+To completely level the playing field, two more notations will be allowed:
 ```javascript
 function ExampleFn() {
   /* private */static field = 1; //The `private` keyword is implied by the scope and therefore useless.
@@ -57,9 +78,9 @@ function ExampleFn() {
   console.log(`new sum = ${ExampleFn#.field1 + ExampleFn#.field2}`);
 }
 ```
-The end result of this notation allows the function to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. While this feature is at first glance somewhat similar to the functionality of a generator, it is in fact very different, and a necessary feature for ensuring that fully featured constructor functions can still be generated without the help of the `class` keyword. See the **Implementation details...** section for more information. Access to such members can be made through the `#` operator with the owning `function` as the left parameter.
+The end result of this notation allows the function to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. While this feature is at first glance somewhat similar to the functionality of a generator, it is in fact very different, and a necessary feature for ensuring that fully featured constructor functions can still be generated without the help of the `class` keyword. See the [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) section for more information. Access to such members can be made through the `#` operator with the owning `function` as the left parameter.
 
-Missing from the above function examples are the use of `async` and `*`(to define a generator). It is the intention of this proposal that these also be supported. The `private` and `protected` keywords are meant to provide a privilege level to any and all possible forms of member variable, property, and function declaration that make sense within a class or object. Given the arguments that have led to [this other proposal](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
+Missing from the above function examples are the use of `async` and `*`(to define a generator). It is the intention of this proposal that these also be supported. The `private` and `protected` keywords are meant to provide a privilege level to any and all possible forms of member variable, property, and function declaration that make sense within a class or object. Given the arguments that have led to [proposal-class-fields](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
 ```javascript
 class Example {
   private privField1 = "value";
@@ -239,7 +260,7 @@ const SubExample = Class(function(privMap) {
 The addition of `class` keyword also brought the `Reflect` API with it, ensuring that those who have the desire to avoid using the `class` keyword can do so without issue. It is the intention of this proposal that this ability be maintained even though the addition of privilege levels. This is done by allowing the new tokens (`private`, `protected`, & `#`) to be used in object literal declarations as shown in the notation example above. Because any member declared `private` or `protected` will not be publicly accessible on the object instance, any object containing such members must also contain 1 or more functions which, taken together, access all `private` and `protected` members. These functions must be declared within the scope of the object literal declaration.
 
 ## Mutations to objects...
-Any function added to an object literal or a `class` prototype after the declaration will not have access to the `private` and `protected` members of the object literal or `class`. The reason for this can be seen by looking at the translated code in **The `private` and `protected` keywords...** section above. The result of a `private` or `protected` declaration is a `Symbol` that only exists within the scope of the corresponding object literal or `class` declaration. Functions declared later will not have access to these `Symbols`. Also, since these `Symbols` are not themselves part of the object literal or `class` declaration, there is no means of retrieving these `Symbols` via any object literal, `class` constructor, or `class` prototype.
+Any function added to an object literal or a `class` prototype after the declaration will not have access to the `private` and `protected` members of the object literal or `class`. The reason for this can be seen by looking at the translated code in [**The `private` and `protected` keywords...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#the-private-and-protected-keywords) section above. The result of a `private` or `protected` declaration is a `Symbol` that only exists within the scope of the corresponding object literal or `class` declaration. Functions declared later will not have access to these `Symbols`. Also, since these `Symbols` are not themselves part of the object literal or `class` declaration, there is no means of retrieving these `Symbols` via any object literal, `class` constructor, or `class` prototype.
 
 ## Implementation details...
 Every object will contain 2 new slots: 

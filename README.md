@@ -290,7 +290,7 @@ There will be those who strongly disagree with the use of the `private` keyword 
 Besides, the use of WeakMaps for providing private data is already a well known use case. Those of us implementing such an approach are already aware that the private data exists in a separate object. As such, the mental model for the new syntax is quite simple: `obj#.field <-> [[WeakMap]].get(obj).field`. The internal reality will not be too different:
 `obj#.field <-> obj.[[PrivateValues]][obj.[[DeclarationInfo]].field]`. The same mapping will hold true for array notation (`[]`) as well. This gives the `#` a very singular, easy to understand conceptual meaning: 
 
-`<lParam>#<rParam> == <lParam>.[[PrivateValues]][<lParam>.[[DeclarationInfo]]<rParam>]`
+`<lParam>#<rParam> === <lParam>.[[PrivateValues]][<lParam>.[[DeclarationInfo]]<rParam>]`
 
 ## The gotchas...
 Because `obj#;` is a `SyntaxError`, there's no way to directly get at the private container. As such, the following things just won't work over private members:

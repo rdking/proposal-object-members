@@ -1,0 +1,26 @@
+{
+  "name": "poc",
+  "version": "1.0.0",
+  "description": "Proof of concept for new Object Members proposal",
+  "main": "privacy.es6.js",
+  "scripts": {
+    "test": "node --inspect test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rdking/proposal-object-members.git"
+  },
+  "keywords": [
+    "javascript",
+    "ecmascript",
+    "private",
+    "class",
+    "field"
+  ],
+  "author": "Ranando D. King",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/rdking/proposal-object-members/issues"
+  },
+  "homepage": "https://github.com/rdking/proposal-object-members#readme"
+}

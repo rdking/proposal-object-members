@@ -3,18 +3,34 @@ var Privacy = (() => {
     const IS_PROXY = Symbol("IS_PROXY");
     const IS_PV = Symbol("IS_PV");
     const DATA = Symbol("DATA");
-    const CALL_STACK = Symbol("CALL_STACK");
 
     var handler = {
         slots: new WeakMap(),
+        stack: [],
+        getCallerDI() {
+            //This only exists because Function.caller has been deprecated.
+            var retval;
+            if (this.stack.length) {
+                let currentFn = this.stack[this.stack.length-1];
+                let cfnPvt = this.slots.get(currentFn[IS_PROXY] ? currentFn : this.slots.get(currentFn)); 
+                let eStack = (new Error()).stack.split('\n');
+                let regex = new RegExp(`\\s*at\\s+Proxy\.${currentFn.name || "<anonymous>"}\\s+\\([\\w/\\\\\\-\\.]+:\\d+:\\d+\\)`);
+                if (regex.test(eStack[4]))
+                    retval = cfnPvt.DeclarationInfo;
+            }
+            return retval;
+        },
         getPrivateValue(target, key) {
             let pvtKey = undefined;
-            let thisDI = target.DeclarationInfo;
+            let thisDI = target.DeclarationInfo[0];
             let thisPV = target.PrivateValues;
-            let methodDI = this.get.caller['[[DeclarationInfo]]'];
+            let methodDI = this.getCallerDI();
 
-            if (!methodDI || ((methodDI !== thisDI) && !thisDI.isPrototypeOf(methodDI)))
+            if (!(methodDI && methodDI.find((value) => {
+                return (value === thisDI) || (thisDI.isPrototypeOf(value));
+            }))) {
                 throw new TypeError();
+            }
 
             if (key in target.DeclarationInfo)
                 pvtKey = target.DeclarationInfo[key];
@@ -28,7 +44,7 @@ var Privacy = (() => {
             let pvtKey = undefined;
             let thisDI = target.DeclarationInfo;
             let thisPV = target.PrivateValues;
-            let methodDI = arguments.callee.caller['[[DeclarationInfo]]'];
+            let methodDI = this.getCallerDI();
 
             if (!methodDI || ((methodDI !== thisDI) && !thisDI.isPrototypeOf(methodDI)))
                 throw new TypeError();
@@ -73,11 +89,11 @@ var Privacy = (() => {
                 retval = new Proxy(retval, this);
             }
             
-            if (!this.slots.has(target)) {
+            if (!this.slots.has(newTarget.prototype)) {
                 throw new TypeError(`Constructor ${target.name || "anonymous"} must be wrapped with Class.wrap()`);
             }
 
-            var pv = this.slots.get(target);
+            var pv = this.slots.get(newTarget.prototype);
             if (!this.slots.has(retval)) {
                 this.slots.set(retval, {
                     [IS_PV]: true,
@@ -86,7 +102,7 @@ var Privacy = (() => {
                 });
             }
             else {
-                let rpv = this.slots.get(target);
+                let rpv = this.slots.get(retval);
                 if (!pv.PrivateValues.isPrototypeOf(rpv.PrivateValues))
                     Object.setPrototypeOf(rpv.PrivateValues, pv.PrivateValues);
                 if (pv.DeclarationInfo !== rpv.DeclarationInfo)
@@ -96,8 +112,11 @@ var Privacy = (() => {
             return retval;
         },
         apply(target, context, args) {
+            this.stack.push(target);
             var pContext = (context[IS_PROXY]) ? context : new Proxy(context, handler);
-            return Reflect.apply(target, pContext, args);
+            var retval = Reflect.apply(target, pContext, args);
+            this.stack.pop();
+            return retval;
         }
     };
 
@@ -152,15 +171,16 @@ var Privacy = (() => {
         var privateSlot = { [IS_PV]: true, PrivateValues: {}, DeclarationInfo: {}, InheritanceInfo: {} };
         
         //Set the private data for the constructor and prototype
-        for (let field in ctorData) {
-            let ({field, def}) = getFieldDef(ctorData, field);
-            let isStatic = ctorData[field].static;
+        for (let fieldName in ctorData) {
+            let {field, def} = getFieldDef(ctorData, fieldName);
+            let isStatic = def.static;
             let slot = (isStatic) ? staticSlot : privateSlot;
-            if (ctorData[field].private) {
-                Object.defineProperty(slot.PrivateValues, field, def);
-                slot.DeclarationInfo[field] = Symbol(field.toString());
-                if (!!ctorData[field].shared)
-                    slot.InheritanceInfo[field] = slot.DeclarationInfo[field];
+            if (def.private) {
+                let fieldSymbol = Symbol(field.toString())
+                slot.DeclarationInfo[field] = fieldSymbol;
+                Object.defineProperty(slot.PrivateValues, fieldSymbol, def);
+                if (!!def.shared)
+                    slot.InheritanceInfo[field] = fieldSymbol;
             }
             else {
                 let target = (isStatic) ? ctor : proto;
@@ -173,10 +193,9 @@ var Privacy = (() => {
         //Modify all functions of the class into proxies and add the appropriate definitions.
         var protoData = handler.slots.get(proto);
         var ctorData = handler.slots.get(ctor);
-        for (let pair of [{data: protoData.PrivateValues, info: protoData.DeclarationInfo}, 
-                          {data: ctorData.PrivateValues, info: ctorData.DeclarationInfo},
-                          {data: proto, info: protoData.DeclarationInfo}]) {
-            var defs = Object.getOwnPropertyDescriptors(pair.data);
+        var info = [protoData.DeclarationInfo, ctorData.DeclarationInfo];
+        for (let data of [protoData.PrivateValues, ctorData.PrivateValues, proto]) {
+            var defs = Object.getOwnPropertyDescriptors(data);
             for (let key in defs) {
                 let def = defs[key];
                 let changed = false;
@@ -186,16 +205,20 @@ var Privacy = (() => {
 
                 for (let prop of ["value", "get", "set"]) {
                     if (typeof(def[prop]) == "function") {
+                        let p = def[prop];
                         changed = true;
-                        def[prop] = new Proxy(def[prop], handler);
+                        def[prop] = new Proxy(p, handler);
                         handler.slots.set(def[prop], {
-                            DeclarationInfo: { __proto__: pair.info }
+                            IS_PROXY: true,
+                            className: (isFn) ? obj.name : "Object",
+                            DeclarationInfo: { __proto__: info }
                         });
+                        handler.slots.set(p, def[prop]);
                     }
                 }
 
                 if (changed) {
-                    Object.defineProperty(pair.data, key, def);
+                    Object.defineProperty(data, key, def);
                 }
             }
         }

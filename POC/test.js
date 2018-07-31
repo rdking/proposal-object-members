@@ -7,8 +7,8 @@ var Example = Privacy(class Example extends Privacy.wrap(Object) {
         //This function contains field definitions for the data in this class
         return {
             ['private field1']: 'alpha',
-            ['protected field2']: 0,
-            ['private static field3']: 42,
+            ['static private field2']: 0,
+            ['protected field3']: 42,
             ['protected static field4']: 'You can see me!'
         }
     }
@@ -20,7 +20,7 @@ var Example = Privacy(class Example extends Privacy.wrap(Object) {
     print() {
         console.log(`field1 = ${this['#'].field1}`);
         console.log(`field2 = ${this.constructor['#'].field2}`);
-        console.log(`field3 = ${this['#'][field3]}`);
+        console.log(`field3 = ${this['#']['field3']}`);
         console.log(`field4 = ${this.constructor['#'].field4}`);
     }
 });

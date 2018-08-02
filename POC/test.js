@@ -1,5 +1,6 @@
 var Privacy = require('./privacy.es6');
 
+console.log("Testing basic classes...");
 //We can't just inherit from Object by not extending.
 //All non-Privacy objects must be wrapped to use as a base.
 var Example = Privacy(class Example extends Privacy.wrap(Object) {
@@ -28,21 +29,22 @@ var Example = Privacy(class Example extends Privacy.wrap(Object) {
 var test1 = new Example();
 test1.print();
 
+console.log("\nTesting subclasses...");
 var SubExample = Privacy(class SubExample extends Example {
-    static [Privacy.Data]() {
+    static [Privacy.DATA]() {
         return {
             yes: 'You can always see me!',
             ['static no']: "I didn't forget this either!",
             ['private field1']() {
                 console.log("Non-interferring masking is possible as well.");
-                console.log(`The old "field1" is still '${super['#'].field1}'!`);
+                console.log(`The old "field3" is still '${super['#'].field3}'!`);
             }
         }
     }
 
     constructor() {
         super();
-        this['#'].field2 = 21;
+        this['#'].field3 = 21;
     }
 
     print() {

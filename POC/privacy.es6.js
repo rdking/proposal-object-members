@@ -1,5 +1,3 @@
-var PowerProxy = require("./PowerProxy");
-
 var Privacy = (() => {
     const IS_PROXY = Symbol("IS_PROXY");
     const IS_PV = Symbol("IS_PV");
@@ -105,10 +103,6 @@ var Privacy = (() => {
                 retval = Reflect.get(target, key, receiver);
             }
 
-            if (retval && (typeof(target) == "function") && (key == "prototype")) {
-                retval = new PowerProxy(retval, handler);
-            }
-
             return retval;
         },
         set(target, key, value, receiver) {
@@ -121,7 +115,7 @@ var Privacy = (() => {
             if (!retval[IS_PROXY]) {
                 retval = new Proxy(retval, this);
             }
-            
+
             if (!this.slots.has(newTarget.prototype)) {
                 throw new TypeError(`Constructor ${target.name || "anonymous"} must be wrapped with Class.wrap()`);
             }
@@ -245,6 +239,11 @@ var Privacy = (() => {
         }
         handler.slots.set(ctor, staticSlot);
         handler.slots.set(proto, privateSlot);
+
+        if (!Object.getPrototypeOf(proto)[IS_PROXY]) {
+            let pProto = new Proxy(Object.getPrototypeOf(proto), handler);
+            Object.setPrototypeOf(proto, pProto);
+        }
         
         //Modify all functions of the class into proxies and add the appropriate definitions.
         var info = [privateSlot.DeclarationInfo[0], staticSlot.DeclarationInfo[0]];
@@ -259,7 +258,7 @@ var Privacy = (() => {
                         let p = def[prop];
                         changed = true;
                         if (key == "constructor") {
-                            def[prop] = new PowerProxy(p, handler);
+                            def[prop] = new Proxy(p, handler);
                             let ctorSlot = handler.slots.get(p);
                             handler.slots.set(def[prop], ctorSlot);
                             ctorSlot.DeclarationInfo.push(privateSlot.DeclarationInfo[0]);
@@ -296,12 +295,12 @@ var Privacy = (() => {
                 if (typeof(obj) != "function")
                     throw new TypeError("Cannot wrap non-function for inheritance.");
 
-                var retval = (obj[IS_PROXY]) ? obj : new PowerProxy(obj, handler);
+                var retval = (obj[IS_PROXY]) ? obj : new Proxy(obj, handler);
                 if (!handler.slots.has(obj))
                     handler.slots.set(obj, { PrivateValues: Object.prototype, 
                                              DeclarationInfo: [Object.prototype],
                                              InheritanceInfo: Object.prototype });
-                if (!handler.slots.has(obj.prototype))
+                if (obj.prototype && !handler.slots.has(obj.prototype))
                     handler.slots.set(obj.prototype, { PrivateValues: Object.prototype, 
                                                        DeclarationInfo: [Object.prototype],
                                                        InheritanceInfo: Object.prototype });

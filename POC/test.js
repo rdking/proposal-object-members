@@ -37,7 +37,13 @@ var SubExample = Privacy(class SubExample extends Example {
             ['static no']: "I didn't forget this either!",
             ['private field1']() {
                 console.log("Non-interferring masking is possible as well.");
+                /*
+                I can't figure out how to get the line below to work. It seems that
+                `super` is implemented in a way that doesn't directly access prototype
+                properties.
+                */
                 console.log(`The old "field3" is still '${super['#'].field3}'!`);
+                //*/
             }
         }
     }

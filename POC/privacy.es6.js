@@ -4,17 +4,31 @@ var Privacy = (() => {
     const DATA = Symbol("DATA");
     const CONTEXT = Symbol("CONTEXT");
 
+    function proxyCheck(obj) { //Necessary since prototypes report as well...
+        'use strict';
+        var proto = Object.getPrototypeOf(obj);
+        Object.setPrototypeOf(obj, null);
+        var retval = obj[IS_PROXY];
+        Object.setPrototypeOf(obj, proto);
+        return retval;
+    }
+
+    function fixSuperProto(fn) {
+        var proto = fn.prototype;
+        var superProto = Object.getPrototypeOf(proto);
+        if (superProto) {
+            let pSuperProto = new Proxy(superProto, handler);
+            Object.setPrototypeOf(proto, pSuperProto);
+            if (!proxyCheck(superProto)) {
+                handler.slots.set(superProto, null);
+                handler.slots.set(pSuperProto, null);
+            }
+        }
+    }
+
     var handler = {
         slots: new WeakMap(),
         stack: [],
-        proxyCheck(obj) { //Necessary since prototypes report as well...
-            'use strict';
-            var proto = Object.getPrototypeOf(obj);
-            Object.setPrototypeOf(obj, null);
-            var retval = obj[IS_PROXY];
-            Object.setPrototypeOf(obj, proto);
-            return retval;
-        },
         getCallerDI() {
             //This only exists because Function.caller has been deprecated.
             //It's only approximate and can be spoofed under the right conditions.
@@ -112,15 +126,15 @@ var Privacy = (() => {
         construct(target, args, newTarget) {
             this.stack.push(target);
             var retval = Reflect.construct(target, args, newTarget);
-            if (!retval[IS_PROXY]) {
+            if (!proxyCheck(retval)) {
                 retval = new Proxy(retval, this);
             }
-
-            if (!this.slots.has(newTarget.prototype)) {
+            var proto = Object.getPrototypeOf(retval);
+            if (!this.slots.has(proto)) {
                 throw new TypeError(`Constructor ${target.name || "anonymous"} must be wrapped with Class.wrap()`);
             }
 
-            var pv = this.slots.get(newTarget.prototype);
+            var pv = this.slots.get(proto);
             if (!this.slots.has(retval)) {
                 this.slots.set(retval, {
                     [IS_PV]: true,
@@ -140,7 +154,7 @@ var Privacy = (() => {
         },
         apply(target, context, args) {
             this.stack.push(target);
-            var pContext = (context[IS_PV])? context[CONTEXT] : (context[IS_PROXY]) ? context : new Proxy(context, handler);
+            var pContext = (context[IS_PV])? context[CONTEXT] : (proxyCheck(context)) ? context : new Proxy(context, handler);
             var retval = Reflect.apply(target, pContext, args);
             this.stack.pop();
             return retval;
@@ -197,7 +211,7 @@ var Privacy = (() => {
         //Make sure that if we got a non-function, it's set up right...
         if (!isFn) {
             let oProto = Object.getPrototypeOf(obj);
-            if (!oProto[IS_PROXY])
+            if (!proxyCheck(oProto))
                 Object.setPrototypeOf(obj, Privacy.wrap(oProto));
             if (!obj.constructor)
                 obj.constructor = function () { Reflect.construct(Object.getPrototypeOf(obj), [], obj) };
@@ -237,14 +251,13 @@ var Privacy = (() => {
                 Object.defineProperty(target, field, def);
             }
         }
+
+        if (ctor)
+            fixSuperProto(ctor);
+
         handler.slots.set(ctor, staticSlot);
         handler.slots.set(proto, privateSlot);
 
-        if (!Object.getPrototypeOf(proto)[IS_PROXY]) {
-            let pProto = new Proxy(Object.getPrototypeOf(proto), handler);
-            Object.setPrototypeOf(proto, pProto);
-        }
-        
         //Modify all functions of the class into proxies and add the appropriate definitions.
         var info = [privateSlot.DeclarationInfo[0], staticSlot.DeclarationInfo[0]];
         for (let data of [privateSlot.PrivateValues, staticSlot.PrivateValues, proto]) {
@@ -295,7 +308,6 @@ var Privacy = (() => {
                 if (typeof(obj) != "function")
                     throw new TypeError("Cannot wrap non-function for inheritance.");
 
-                var retval = (obj[IS_PROXY]) ? obj : new Proxy(obj, handler);
                 if (!handler.slots.has(obj))
                     handler.slots.set(obj, { PrivateValues: Object.prototype, 
                                              DeclarationInfo: [Object.prototype],
@@ -304,6 +316,9 @@ var Privacy = (() => {
                     handler.slots.set(obj.prototype, { PrivateValues: Object.prototype, 
                                                        DeclarationInfo: [Object.prototype],
                                                        InheritanceInfo: Object.prototype });
+                
+                fixSuperProto(obj);
+                var retval = (proxyCheck(obj)) ? obj : new Proxy(obj, handler);
                 return retval;
             }
         }

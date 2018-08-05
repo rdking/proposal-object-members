@@ -37,13 +37,7 @@ var SubExample = Privacy(class SubExample extends Example {
             ['static no']: "I didn't forget this either!",
             ['private field1']() {
                 console.log("Non-interferring masking is possible as well.");
-                /*
-                I can't figure out how to get the line below to work. It seems that
-                `super` is implemented in a way that doesn't directly access prototype
-                properties.
-                */
                 console.log(`The old "field3" is still '${super['#'].field3}'!`);
-                //*/
             }
         }
     }
@@ -65,3 +59,32 @@ test2 = new SubExample();
 test2.print();
 console.log(`test2.yes = ${test2.yes}`);
 console.log(`SubExample.no = ${SubExample.no}`);
+
+console.log("\nTesting objects...");
+var objExample = Privacy({
+    ['private field1']: "signs point to yes",
+    ['protected field2']: "seems likely",
+    field3: "absolutely",
+    print() {
+        console.log(`field1 = ${this['#'].field1}`);
+        console.log(`field2 = ${this['#'].field2}`);
+        console.log(`field3 = ${this.field3}`);
+    }
+});
+
+objExample.print();
+
+console.log("\nTesting object inheritance...");
+var objSubExample = Privacy({
+    __proto__: objExample,
+    ['private field1']: "new and improved",
+    print() {
+        console.log("I should be able to see field 2 from here...");
+        this['#'].field2 += "... not!";
+        console.log(`field1 = ${this['#'].field1}`);
+        console.log(`field2 = ${this['#'].field2}`);
+        console.log(`field3 = ${this.field3}`);
+        console.log("And the old stuff is still there too!");
+        super.print();
+    }
+});

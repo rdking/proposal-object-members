@@ -235,9 +235,9 @@ var Privacy = (() => {
         var ctorData = (ctor) ? (DATA in ctor) ? ctor[DATA]() : (isFn) ? {} : obj : obj;
         var proto = (isFn) ? ctor.prototype : obj;
         var sProto = (ctor) ? Object.getPrototypeOf(ctor.prototype) : Object.getPrototypeOf(proto);
-        var parent = (sProto) ? sProto.constructor : null;
-        var parentStaticSlot = (parent) ? handler.slots.get(parent) : {};
-        var parentPrivateSlot = (parent) ? handler.slots.get(parent.prototype) : {};
+        var parent = (sProto) ? (ctor) ? sProto.constructor : (proxyCheck(sProto)) ? sProto : null : null;
+        var parentStaticSlot = (ctor) ? (parent) ? handler.slots.get(parent) : {} : {};
+        var parentPrivateSlot = (parent) ? handler.slots.get((ctor) ? parent.prototype : parent) : {};
         var staticSlot = { [IS_PV]: true, className: (ctor) ? ctor.name || "<anonymous>" : "<anonymous>",
                            PrivateValues: { __proto__: parentStaticSlot.PrivateValues || Object.prototype },
                            DeclarationInfo: inheritDeclarations(parentStaticSlot.DeclarationInfo || []),
@@ -250,7 +250,8 @@ var Privacy = (() => {
         var pcdProto = new Proxy(cdProto, handler);
                             
         //Set the private data for the constructor and prototype
-        for (let fieldName in ctorData) {
+        var ctorDataKeys = Object.getOwnPropertyNames(ctorData).concat(Object.getOwnPropertySymbols(ctorData));
+        for (let fieldName of ctorDataKeys) {
             let {field, def} = getFieldDef(ctorData, fieldName);
             let isStatic = def.static;
             let slot = (isStatic) ? staticSlot : privateSlot;

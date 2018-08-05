@@ -88,3 +88,5 @@ var objSubExample = Privacy({
         super.print();
     }
 });
+
+objSubExample.print();

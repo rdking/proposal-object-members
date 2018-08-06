@@ -112,8 +112,13 @@ var Privacy = (() => {
             else if (key === CONTEXT) {
                 retval = target[CONTEXT];
             }
-            else if ((key === '#') && this.canAccess(opTarget)) {
-                retval = new Proxy({ [CONTEXT]: receiver, __proto__: this.slots.get(opTarget) }, this);
+            else if (key === '#') {
+                if (this.canAccess(opTarget)) {
+                    retval = new Proxy({ [CONTEXT]: receiver, __proto__: this.slots.get(opTarget) }, this);
+                }
+                else {
+                    throw new ReferenceError(`Cannot access private data from invalid scope.`);
+                }
             }
             else if (target[IS_PV] && (key !== IS_PV)) {
                 retval = this.getPrivateValue(target, key);
@@ -121,6 +126,9 @@ var Privacy = (() => {
             else {
                 retval = Reflect.get(target, key, receiver);
             }
+
+            if ((key === "toString") && (retval === Function.prototype.toString))
+                retval = retval.bind(target);
 
             return retval;
         },
@@ -172,7 +180,8 @@ var Privacy = (() => {
 
     function getFieldDef(ctorData, field) {
         var def = Object.getOwnPropertyDescriptor(ctorData, field);
-        def.writable = true;
+        if ("value" in def)
+            def.writable = true;
 
         if (typeof(field) !== "symbol") {
             let parts = field.split(' ');
@@ -331,14 +340,16 @@ var Privacy = (() => {
         "DATA": { value: DATA },
         wrap: {
             value: function wrap(obj) {
+                var pv = (arguments[1] && handler.canAccess(arguments[1])) ? handler.slots.get(arguments[1]) : null;
+
                 if (typeof(obj) != "function")
                     throw new TypeError("Cannot wrap non-function for inheritance.");
 
                 if (!handler.slots.has(obj))
-                    handler.slots.set(obj, { PrivateValues: Object.prototype, 
-                                             DeclarationInfo: [Object.prototype],
-                                             InheritanceInfo: Object.prototype });
-                if (obj.prototype && !handler.slots.has(obj.prototype))
+                    handler.slots.set(obj, { PrivateValues: (pv) ? pv.PrivateValues : Object.prototype, 
+                                             DeclarationInfo: (pv) ? pv.DeclarationInfo : [Object.prototype],
+                                             InheritanceInfo: (pv) ? pv.InheritanceInfo : Object.prototype });
+                if (!pv && obj.prototype && !handler.slots.has(obj.prototype))
                     handler.slots.set(obj.prototype, { PrivateValues: Object.prototype, 
                                                        DeclarationInfo: [Object.prototype],
                                                        InheritanceInfo: Object.prototype });

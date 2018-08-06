@@ -19,11 +19,11 @@
         "${workspaceRoot}/POC/node_modules/.bin/jest",
         "--runInBand",
         "-c",
-        "${workspaceRoot/POC/jest.config.js",
+        "${workspaceRoot}/POC/jest.config.js",
         "tests"
       ],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
+      "console": "internalConsole",
+      "internalConsoleOptions": "openOnSessionStart",
       "port": 9235
     }
   ]

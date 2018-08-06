@@ -22,5 +22,8 @@
   "bugs": {
     "url": "https://github.com/rdking/proposal-object-members/issues"
   },
-  "homepage": "https://github.com/rdking/proposal-object-members#readme"
+  "homepage": "https://github.com/rdking/proposal-object-members#readme",
+  "devDependencies": {
+    "jest": "^23.4.2"
+  }
 }

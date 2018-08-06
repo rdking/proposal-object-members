@@ -10,7 +10,8 @@ var Example = Privacy(class Example extends Privacy.wrap(Object) {
             ['private field1']: 'alpha',
             ['static private field2']: 0,
             ['protected field3']: 42,
-            ['protected static field4']: 'You can see me!'
+            ['protected static field4']: 'You can see me!',
+            ['private foo']: Math.PI
         }
     }
 
@@ -28,6 +29,8 @@ var Example = Privacy(class Example extends Privacy.wrap(Object) {
 
 var test1 = new Example();
 test1.print();
+test1.foo = 2;
+delete test1.foo;
 
 console.log("\nTesting subclasses...");
 var SubExample = Privacy(class SubExample extends Example {

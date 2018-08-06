@@ -25,5 +25,8 @@
   "homepage": "https://github.com/rdking/proposal-object-members#readme",
   "devDependencies": {
     "jest": "^23.4.2"
+  },
+  "dependencies": {
+    "reinstall": "^2.0.0"
   }
 }

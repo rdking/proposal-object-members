@@ -1,10 +1,26 @@
 'use strict';
+
 var Privacy = (() => {
     const IS_PROXY = Symbol("IS_PROXY");
     const IS_PV = Symbol("IS_PV");
     const DATA = Symbol("DATA");
     const CONTEXT = Symbol("CONTEXT");
     const SUPER = Symbol("SUPER");
+
+    if (Error.prepareStackTrace) {
+        function prepareStackTrace(err, trace) {
+            var retval;
+
+            err.stackTrace = trace;
+            if (typeof(prepareStackTrace.original) == "function")
+                retval = prepareStackTrace.original(err, trace);
+
+            return retval;
+        }
+
+        prepareStackTrace.original = Error.prepareStackTrace.bind(Error);
+        Error.prepareStackTrace = prepareStackTrace;
+    }
 
     function proxyCheck(obj) { //Necessary since prototypes report as well...
         'use strict';
@@ -23,12 +39,24 @@ var Privacy = (() => {
             //It's only approximate and can be spoofed under the right conditions.
             var retval;
             if (this.stack.length) {
+                let err = new Error();
                 let currentFn = this.stack[this.stack.length-1];
                 let cfnPvt = this.slots.get(currentFn); 
-                let eStack = (new Error()).stack.split('\n');
-                let regex = new RegExp(`\\s*at\\s+(Object.|Proxy\\.|new\\s+)${currentFn.name || "<anonymous>"}(\\.Privacy\\.[\\<\\>\\w]+?)*?\\s+\\([\\w/\\\\\\-\\.]+:\\d+:\\d+\\)`);
-                if (regex.test(eStack[4]))
-                    retval = cfnPvt.DeclarationInfo;
+                if (err.stackTrace) {
+                    let frame = err.stackTrace[3];
+                    let frameFn = (frame) ? frame.getFunction() : undefined;
+                    if (((typeof(frameFn) == "function") && (frameFn === currentFn)) || 
+                        (frame.getFunctionName() == currentFn.name) ||
+                        ((currentFn.name.length === 0) && /<anonymous>/.test(frame.getFunctionName()))) {
+                        retval = cfnPvt.DeclarationInfo;
+                    }
+                }
+                else {
+                    let eStack = (new Error()).stack.split('\n');
+                    let regex = new RegExp(`${currentFn.name || "<anonymous>"}`);
+                    if (regex.test(eStack[4]))
+                        retval = cfnPvt.DeclarationInfo;
+                }
             }
             return retval;
         },

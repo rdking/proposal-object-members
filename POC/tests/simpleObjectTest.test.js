@@ -49,7 +49,13 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Simple Object Members
                         expect(Privacy.wrap(() => { this['#'].field2 = "changed field2"; }, this)).not.toThrow();
                         expect(this['#'].field2).toBe("changed field2");
                     },
-                    testSuite() {
+                    testSuite3() {
+                        'use strict';
+                        expect(Privacy.wrap(() => {
+                            delete this['#'].field1;
+                        })).toThrow();
+                    },
+                    testSuite4() {
                     }
                 });
             });
@@ -93,6 +99,14 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Simple Object Members
 
             test("Private members should be writable", () => {
                 testObject.testSuite2();
+            });
+
+            test("Private members should not be deleteable", () => {
+                testObject.testSuite3();
+            });
+
+            test("Private members should not be dynamically creatable", () => {
+                testObject.testSuite4();
             });
         });
     });

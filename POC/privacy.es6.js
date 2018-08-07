@@ -1,3 +1,4 @@
+'use strict';
 var Privacy = (() => {
     const IS_PROXY = Symbol("IS_PROXY");
     const IS_PV = Symbol("IS_PV");
@@ -25,7 +26,7 @@ var Privacy = (() => {
                 let currentFn = this.stack[this.stack.length-1];
                 let cfnPvt = this.slots.get(currentFn); 
                 let eStack = (new Error()).stack.split('\n');
-                let regex = new RegExp(`\\s*at\\s+(Proxy\\.|new\\s+)${currentFn.name || "<anonymous>"}\\s+\\([\\w/\\\\\\-\\.]+:\\d+:\\d+\\)`);
+                let regex = new RegExp(`\\s*at\\s+(Object.|Proxy\\.|new\\s+)${currentFn.name || "<anonymous>"}(\\.Privacy\\.[\\<\\>\\w]+?)*?\\s+\\([\\w/\\\\\\-\\.]+:\\d+:\\d+\\)`);
                 if (regex.test(eStack[4]))
                     retval = cfnPvt.DeclarationInfo;
             }
@@ -42,7 +43,7 @@ var Privacy = (() => {
 
             if (methodDI) {
                 for (let di of diList) {
-                    thisDI = methodDI.find((value) => {
+                    let thisDI = methodDI.find((value) => {
                         return (value === di) || (value.isPrototypeOf(di)) || (di.isPrototypeOf(value));
                     });
                     if (thisDI)
@@ -75,8 +76,7 @@ var Privacy = (() => {
                 throw new TypeError(`Current method does not have access to private members of ${target.className}`);
             }
 
-            if (key in thisDI)
-                pvtKey = thisDI[key];
+            pvtKey = thisDI[key];
 
             if (!(pvtKey in thisPV))
                 throw new ReferenceError(`Cannot access non-existent private key ${key}`);
@@ -85,18 +85,28 @@ var Privacy = (() => {
         },
         setPrivateValue(target, key, value) {
             let pvtKey = undefined;
-            let thisDI = target.DeclarationInfo[0];
+            let diList = target.DeclarationInfo;
+            let thisDI = undefined;
             let thisPV = target.PrivateValues;
             let methodDI = this.getCallerDI();
 
-            if (!(methodDI && methodDI.find((value) => {
-                return (value === thisDI) || (thisDI.isPrototypeOf(value));
-            }))) {
+            if (methodDI) {
+                for (let di of diList) {
+                    thisDI = methodDI.find((value) => {
+                        return (value === di) || (value.isPrototypeOf(di)) || (di.isPrototypeOf(value));
+                    });
+                    if (thisDI && (key in thisDI))
+                        break;
+                    else
+                        thisDI = undefined;
+                }
+            }
+
+            if (!thisDI) {
                 throw new TypeError(`Current method does not have access to private members of ${target.className}`);
             }
 
-            if (key in thisDI)
-                pvtKey = thisDI[key];
+            pvtKey = thisDI[key];
 
             if (!(pvtKey in thisPV))
                 throw new ReferenceError(`Cannot access non-existent private key ${key}`);
@@ -171,9 +181,15 @@ var Privacy = (() => {
         },
         apply(target, context, args) {
             this.stack.push(target);
-            var pContext = (context[IS_PV])? context[CONTEXT] : (proxyCheck(context)) ? context : new Proxy(context, handler);
+            var pContext = (!context) ? context : (context[IS_PV])? context[CONTEXT] : (proxyCheck(context)) ? context : new Proxy(context, handler);
             var retval = Reflect.apply(target, pContext, args);
             this.stack.pop();
+            return retval;
+        },
+        deleteProperty(target, key) {
+            var retval = false;
+            if (!target[IS_PV])
+                retval = Reflect.deleteProperty(target, key);
             return retval;
         }
     };
@@ -265,8 +281,11 @@ var Privacy = (() => {
             let isStatic = def.static;
             let slot = (isStatic) ? staticSlot : privateSlot;
             if (def.private) {
-                let fieldSymbol = Symbol(field.toString())
-                slot.DeclarationInfo[0][field] = fieldSymbol;
+                let fieldSymbol = Symbol(field.toString());
+                Object.defineProperty(slot.DeclarationInfo[0], field, {
+                    configurable: true,
+                    value: fieldSymbol
+                });
                 Object.defineProperty(slot.PrivateValues, fieldSymbol, def);
                 if (!!def.shared)
                     slot.InheritanceInfo[field] = fieldSymbol;
@@ -329,6 +348,13 @@ var Privacy = (() => {
         if (ctor && (DATA in ctor))
             delete ctor[DATA];
 
+        for (let di of staticSlot.DeclarationInfo)
+            Object.preventExtensions(di);
+        Object.preventExtensions(staticSlot.InheritanceInfo);
+        for (let di of privateSlot.DeclarationInfo)
+            Object.preventExtensions(di);
+        Object.preventExtensions(privateSlot.InheritanceInfo);
+        
         var retval = (ctor) ? proto.constructor || new Proxy(ctor, handler) : new Proxy(proto, handler);
         if (!ctor) {
             handler.slots.set(retval, privateSlot);

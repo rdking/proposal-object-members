@@ -8,7 +8,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug POC",
-      "program": "${workspaceFolder}/POC/test.js"
+      "program": "${workspaceFolder}/POC/example.js"
     },
     {
       "name": "Debug Jest Tests",

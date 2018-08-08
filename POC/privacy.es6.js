@@ -386,6 +386,22 @@ var Privacy = (() => {
                 var retval = (proxyCheck(obj)) ? obj : new Proxy(obj, handler);
                 return retval;
             }
+        },
+        staticField: {
+            value: function staticField(fn, fieldName, value) {
+                if (handler.slots.has(fn)) {
+                    let slot = handler.slots.get(fn);
+                    let {field, def} = getFieldDef({[fieldName]: value, fieldName);
+                    let fieldSymbol = Symbol(field.toString());
+                    Object.defineProperty(slot.DeclarationInfo[0], field, {
+                        configurable: true,
+                        value: fieldSymbol
+                    });
+                    Object.defineProperty(slot.PrivateValues, fieldSymbol, def);
+                    if (!!def.shared)
+                        slot.InheritanceInfo[field] = fieldSymbol;
+                }
+            }
         }
     });
 

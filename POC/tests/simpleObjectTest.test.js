@@ -123,16 +123,19 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Simple Object Members
                     testSuite5() {
                         var field1;
 
-                        try { field1 = this['#'].field1; }
+                        try {
+                            field1 = this['#'].field1;
+                        }
                         catch (e) {}
                         expect(field1).toBeUndefined();
                         expect(this['#'].field2).toBe("changed field2");
+                        expect(this['#'].field4).toBe("found field4");
                     },
                     testSuite6() {
-                        this['#'].field1 = "found field1"; 
-                        expect(this['#'].field1).toBe("changed field1");
-                        this['#'].field2 = "found field2";
-                        expect(this['#'].field2).toBe("changed field2");
+                        this['#'].field2 = "found field2"; 
+                        expect(this['#'].field2).toBe("found field2");
+                        this['#'].field4 = "changed field4";
+                        expect(this['#'].field4).toBe("changed field4");
                     },
                     testSuite7() {
                         'use strict';
@@ -144,6 +147,25 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Simple Object Members
                         var failed = false;
                         try {
                             this['#'].foo = 'bar';
+                        }
+                        catch (e) {
+                            failed = true;
+                        }
+                        expect(failed).toBeTruthy;
+                    },
+                    testSuite9() {
+                        var failed = false;
+                        try {
+                            let x = this['#'].field1;
+                        }
+                        catch (e) {
+                            failed = true;
+                        }
+                        expect(failed).toBeTruthy;
+
+                        try {
+                            failed = false;
+                            this['#'].method1();
                         }
                         catch (e) {
                             failed = true;
@@ -216,6 +238,10 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Simple Object Members
 
             test("Private members should not be dynamically creatable", () => {
                 subTestObject.testSuite8();
+            });
+
+            test("Private members of the prototype should not be accessible", () => {
+                subTestObject.testSuite9();
             });
         });
     });

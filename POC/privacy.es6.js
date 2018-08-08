@@ -81,7 +81,7 @@ var Privacy = (() => {
 
             return !!exists;
         },
-        getPrivateValue(target, key) {
+        getPrivateName(target, key) {
             let pvtKey = undefined;
             let diList = target.DeclarationInfo;
             let thisDI = undefined;
@@ -109,37 +109,7 @@ var Privacy = (() => {
             if (!(pvtKey in thisPV))
                 throw new ReferenceError(`Cannot access non-existent private key ${key}`);
 
-            return thisPV[pvtKey];
-        },
-        setPrivateValue(target, key, value) {
-            let pvtKey = undefined;
-            let diList = target.DeclarationInfo;
-            let thisDI = undefined;
-            let thisPV = target.PrivateValues;
-            let methodDI = this.getCallerDI();
-
-            if (methodDI) {
-                for (let di of diList) {
-                    thisDI = methodDI.find((value) => {
-                        return (value === di) || (value.isPrototypeOf(di)) || (di.isPrototypeOf(value));
-                    });
-                    if (thisDI && (key in thisDI))
-                        break;
-                    else
-                        thisDI = undefined;
-                }
-            }
-
-            if (!thisDI) {
-                throw new TypeError(`Current method does not have access to private members of ${target.className}`);
-            }
-
-            pvtKey = thisDI[key];
-
-            if (!(pvtKey in thisPV))
-                throw new ReferenceError(`Cannot access non-existent private key ${key}`);
-            
-            thisPV[pvtKey] = value;
+            return pvtKey;
         },
         get(target, key, receiver) {
             var retval;
@@ -159,7 +129,7 @@ var Privacy = (() => {
                 }
             }
             else if (target[IS_PV] && (key !== IS_PV)) {
-                retval = this.getPrivateValue(target, key);
+                retval = target.PrivateValues[this.getPrivateName(target, key)];
             }
             else {
                 retval = Reflect.get(target, key, receiver);
@@ -171,7 +141,12 @@ var Privacy = (() => {
             return retval;
         },
         set(target, key, value, receiver) {
-            (target[IS_PV]) ? this.setPrivateValue(target, key, value) : Reflect.set(target, key, value, receiver);
+            if (target[IS_PV]) {
+                target.PrivateValues[this.getPrivateName(target, key)] = value;
+            }
+            else {
+                Reflect.set(target, key, value, receiver);
+            }
             return true;
         },
         stageInstance(instance) {
@@ -181,15 +156,15 @@ var Privacy = (() => {
                 this.slots.set(instance, {
                     [IS_PV]: true,
                     PrivateValues: Object.create(pv.PrivateValues),
-                    DeclarationInfo: [pv.DeclarationInfo[0]]
+                    DeclarationInfo: pv.DeclarationInfo
                 });
             }
             else {
                 let rpv = this.slots.get(instance);
                 if (!pv.PrivateValues.isPrototypeOf(rpv.PrivateValues))
                     Object.setPrototypeOf(rpv.PrivateValues, pv.PrivateValues);
-                if (pv.DeclarationInfo[0] !== rpv.DeclarationInfo[0])
-                    rpv.DeclarationInfo[0] = pv.DeclarationInfo[0];
+                if (pv.DeclarationInfo !== rpv.DeclarationInfo)
+                    rpv.DeclarationInfo = pv.DeclarationInfo;
             }
         },
         construct(target, args, newTarget) {
@@ -253,15 +228,16 @@ var Privacy = (() => {
         return {field, def};
     }
 
-    function inheritDeclarations(list) {
+    function inheritDeclarations(ps) {
+        var list = ps.DeclarationInfo;
         var retval = [];
 
-        for (let item of list) {
-            retval.push(Object.create(item));
-        }
+        retval.push(Object.create(ps.InheritanceInfo || Object.prototype));
 
-        if (!retval.length) {
-            retval.push({});
+        if (list) {
+            for (let item of list) {
+                retval.push(item);
+            }
         }
 
         return retval;
@@ -273,9 +249,6 @@ var Privacy = (() => {
 
         //Make sure that if we got a non-function, it's set up right...
         if (!isFn) {
-            //let oProto = Object.getPrototypeOf(obj);
-            // if (!proxyCheck(oProto))
-            //     Object.setPrototypeOf(obj, Privacy.wrap(oProto));
             if (hasCtor) {
                 if (obj.constructor.prototype !== obj) {
                     obj.constructor.prototype = obj;
@@ -293,11 +266,11 @@ var Privacy = (() => {
         var parentPrivateSlot = (parent) ? handler.slots.get((ctor) ? parent.prototype : parent) : {};
         var staticSlot = { [IS_PV]: true, className: (ctor) ? ctor.name || "<anonymous>" : "<anonymous>",
                            PrivateValues: { __proto__: parentStaticSlot.PrivateValues || Object.prototype },
-                           DeclarationInfo: inheritDeclarations(parentStaticSlot.DeclarationInfo || []),
+                           DeclarationInfo: inheritDeclarations(parentStaticSlot),
                            InheritanceInfo: { __proto__: parentStaticSlot.InheritanceInfo || Object.prototype } };
         var privateSlot = { [IS_PV]: true, className: (ctor) ? ctor.name || "<anonymous>" : "<anonymous>",
                             PrivateValues: { __proto__: parentPrivateSlot.PrivateValues || Object.prototype },
-                            DeclarationInfo: inheritDeclarations(parentPrivateSlot.DeclarationInfo || []), 
+                            DeclarationInfo: inheritDeclarations(parentPrivateSlot), 
                             InheritanceInfo: { __proto__: parentPrivateSlot.InheritanceInfo || Object.prototype } };
         var cdProto = { [SUPER]: true };
         var pcdProto = new Proxy(cdProto, handler);
@@ -328,11 +301,13 @@ var Privacy = (() => {
 
         if (ctor)
             handler.slots.set(ctor, staticSlot);
-        handler.slots.set(proto, privateSlot);
-        if (parentPrivateSlot) {
-            handler.slots.set(cdProto, parentPrivateSlot);
-            handler.slots.set(pcdProto, parentPrivateSlot);
+
+        if (sProto) {
+            handler.slots.set(cdProto, privateSlot);
+            handler.slots.set(pcdProto, privateSlot);
         }
+        handler.slots.set(proto, privateSlot);
+
         if (ctor && (DATA in ctor))
             Object.setPrototypeOf(ctorData, pcdProto);
 
@@ -400,13 +375,13 @@ var Privacy = (() => {
                     throw new TypeError("Cannot wrap non-function for inheritance.");
 
                 if (!handler.slots.has(obj))
-                    handler.slots.set(obj, { PrivateValues: (pv) ? pv.PrivateValues : Object.prototype, 
-                                             DeclarationInfo: (pv) ? pv.DeclarationInfo : [Object.prototype],
-                                             InheritanceInfo: (pv) ? pv.InheritanceInfo : Object.prototype });
+                    handler.slots.set(obj, { PrivateValues: (pv) ? pv.PrivateValues : {}, 
+                                             DeclarationInfo: (pv) ? pv.DeclarationInfo : [{}],
+                                             InheritanceInfo: (pv) ? pv.InheritanceInfo : {} });
                 if (!pv && obj.prototype && !handler.slots.has(obj.prototype))
-                    handler.slots.set(obj.prototype, { PrivateValues: Object.prototype, 
-                                                       DeclarationInfo: [Object.prototype],
-                                                       InheritanceInfo: Object.prototype });
+                    handler.slots.set(obj.prototype, { PrivateValues: {}, 
+                                                       DeclarationInfo: [{}],
+                                                       InheritanceInfo: {} });
                 
                 var retval = (proxyCheck(obj)) ? obj : new Proxy(obj, handler);
                 return retval;

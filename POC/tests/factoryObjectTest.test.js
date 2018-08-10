@@ -65,12 +65,16 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
             });
 
             test("Should be able to construct an instance of a factory", () => {
-                expect(() => { factoryInstance = new factory(); }).not.toThrow();
+                expect(() => { debugger; factoryInstance = new factory(); }).not.toThrow();
                 expect(factoryInstance instanceof factory).toBeTruthy();
             });
 
-            test("Operator '#' should not be available from outside", () => {
+            test("Operator '#' should not be available from outside the factory", () => {
                 expect(() => { return factory['#']; }).toThrow();
+            });
+
+            test("Operator '#' should not be available from outside the factory instance", () => {
+                expect(() => { return factoryInstance['#']; }).toThrow();
             });
 
             test("Private members should not be seen as members from outside", () => {
@@ -181,6 +185,9 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                             failed = true;
                         }
                         expect(failed).toBeTruthy;
+                    },
+                    constructor() {
+                        Privacy.staticField(factory.constructor, "private counter", 0);
                     }
                 });
             });

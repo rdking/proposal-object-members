@@ -253,7 +253,6 @@ var Privacy = (() => {
                 if (obj.constructor.prototype !== obj) {
                     obj.constructor.prototype = obj;
                 }
-                obj = obj.constructor;
             }
         }
 
@@ -262,8 +261,8 @@ var Privacy = (() => {
         var proto = (isFn) ? ctor.prototype : obj;
         var sProto = (ctor) ? Object.getPrototypeOf(ctor.prototype) : Object.getPrototypeOf(proto);
         var parent = (sProto) ? (ctor) ? sProto.constructor : (proxyCheck(sProto)) ? sProto : null : null;
-        var parentStaticSlot = (ctor) ? (parent) ? handler.slots.get(parent) : {} : {};
-        var parentPrivateSlot = (parent) ? handler.slots.get((ctor) ? parent.prototype : parent) : {};
+        var parentStaticSlot = (ctor) ? (parent) ? handler.slots.get(parent) || {} : {} : {};
+        var parentPrivateSlot = (parent) ? handler.slots.get((ctor) ? parent.prototype : parent) || {} : {};
         var staticSlot = { [IS_PV]: true, className: (ctor) ? ctor.name || "<anonymous>" : "<anonymous>",
                            PrivateValues: { __proto__: parentStaticSlot.PrivateValues || Object.prototype },
                            DeclarationInfo: inheritDeclarations(parentStaticSlot),
@@ -391,7 +390,7 @@ var Privacy = (() => {
             value: function staticField(fn, fieldName, value) {
                 if (handler.slots.has(fn)) {
                     let slot = handler.slots.get(fn);
-                    let {field, def} = getFieldDef({[fieldName]: value, fieldName);
+                    let {field, def} = getFieldDef({[fieldName]: value}, fieldName);
                     let fieldSymbol = Symbol(field.toString());
                     Object.defineProperty(slot.DeclarationInfo[0], field, {
                         configurable: true,

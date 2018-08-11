@@ -6,7 +6,11 @@ ES, being a prototype based language, has matured to the point that it is being 
 ## Rationale
 One of the main reasons ES developers even bothered to construct their own class factories in ES5 was to hide implementation details from the users of their class factories. While the `_name` convention may have been nice, and sucessfully got many a programmer to respect functions and member data marked this way as private, it did nothing to stop many developers from ignoring the convention, creating software with various security/usability issues, unduely constraining the flexibility of the library developer, and, in some cases, damaging the reputation of the abused library.
 
-This is the reason we need `private` and `protected`. Their existance will allow developers to properly hide what should be hidden from their users. For those who (quite rightly) think this will interfere with their ability to monkey patch code, you should really be filing feature requests and possibly code patches with the library developer to extend its usability and flexibility. Not only do you help the community by doing that, you also prevent yourself from getting "locked in" to a specific version of that library. Put another way, if you can monkey patch, you can submit a patch!
+This is the reason we need `private` and `protected`. Their existence will allow developers to properly hide what should be hidden from their users. For those who (quite rightly) think this will interfere with their ability to monkey patch code, you should really be filing feature requests and possibly code patches with the library developer to extend its usability and flexibility. Not only do you help the community by doing that, you also prevent yourself from getting "locked in" to a specific version of that library. Put another way, if you can monkey patch, you can submit a patch!
+
+With regards to `protected` something must first be understood, it doesn't really protect anything. The problem occurs because ES is a dynamic language. At any time, any code can create an object that inherits another object. Since any object that inherits a particular prototype can manipulate the protected members of any other object inheriting that same prototype, nothing can be done to prevent malicious code from accessing the protected members of any object.
+
+However, absolutely hiding members is not the purpose of the `protected` feature. The main purpose of `protected` is to provide a clear, declarative, soft-privacy that partitions an object's internal API from its external API. This can be thought of as a technical formalization of the underscore convention that is prevelant in existing code bases for use in sharing API between objects. Since no protected member will ever appear to be a public member of the object, there's no chance of accidental use of an internal API. In order to make use of an object's internal API, the developer must deliberately inherit from that object.
 
 ## Existing proposals
 This proposal covers ground in ES for which there are already existing proposals, namely:
@@ -125,8 +129,13 @@ Given code like `obj#.field`, ES should perform the following steps:
 
 See [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) for an explanation of the terms between the double braces (`[[ ]]`).
 
-#### The `private` and `protected` keywords
-These keywords declare `private` members in much the same way as you would expect if you were implementing `private` data using a `WeakMap`. A short example should make it clear.
+#### The `private` keyword
+The `private` keyword declares members in much the same way as you would expect if you were implementing `private` data using a `WeakMap`. The `private` keyword will provide a simple means of implementing a "hard-private" interface. Nothing outside the declaring object will ever have access to any member declared `private` unless the declaring object provides for such. 
+
+#### The `protected` keyword
+The `protected` keyword declares members that are "soft-private" so as to allow them to be shared with inheriting objects. Because of the "soft-privacy" of `protected`, **_nothing declared as such should be considered as private information_**. ES is a dynamic language making privacy an all or nothing situation. What `protected` instead offers is API separation. By declaring fields as `protected` those fields will not appear on the public interface of the object. Instead, they will appear as public members of the object's `private` interface. In this way, methods declared in both the declaring object and other objects using the declaring object as a prototype will be able to access these members.
+
+The examples below should make the usage of both `private` and `protected` clear.
 
 With this proposal's syntax:
 ```javascript
@@ -151,6 +160,7 @@ Loosely Translated to ES6:
 const Class = (function() {
   const privMap = new WeakMap();
   return function Class(fn) {
+    //Ignore the leakyness of this example
     return fn(privMap);
   }
 })();

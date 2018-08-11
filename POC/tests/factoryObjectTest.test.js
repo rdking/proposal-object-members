@@ -58,7 +58,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         }
                         expect(failed).toBeTruthy;
                     },
-                    constructor() {
+                    constructor: function Factory() {
                         Privacy.staticField(factory.constructor, "private counter", 0);
                     }
                 });
@@ -186,7 +186,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         }
                         expect(failed).toBeTruthy;
                     },
-                    constructor() {
+                    constructor: function SubFactory() {
                         Privacy.staticField(factory.constructor, "private counter", 0);
                     }
                 });

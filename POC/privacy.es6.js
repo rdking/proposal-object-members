@@ -197,10 +197,12 @@ var Privacy = (() => {
         }
     };
 
-    function getFieldDef(ctorData, field) {
+    function getFieldDef(ctorData, field, inFn) {
         var def = Object.getOwnPropertyDescriptor(ctorData, field);
         if ("value" in def)
             def.writable = true;
+
+        def.private = !!inFn;
 
         if (typeof(field) !== "symbol") {
             let parts = field.split(' ');
@@ -209,10 +211,15 @@ var Privacy = (() => {
                 switch (part) {
                     case "private":
                         def.private = true;
+                        def.shared = false;
                         break;
                     case "protected":
                         def.private = true;
                         def.shared = true;
+                        break;
+                    case "public":
+                        def.private = false;
+                        def.shared = false;
                         break;
                     case "static":
                         def.static = true;
@@ -390,15 +397,23 @@ var Privacy = (() => {
             value: function staticField(fn, fieldName, value) {
                 if (handler.slots.has(fn)) {
                     let slot = handler.slots.get(fn);
-                    let {field, def} = getFieldDef({[fieldName]: value}, fieldName);
-                    let fieldSymbol = Symbol(field.toString());
-                    Object.defineProperty(slot.DeclarationInfo[0], field, {
-                        configurable: true,
-                        value: fieldSymbol
-                    });
-                    Object.defineProperty(slot.PrivateValues, fieldSymbol, def);
-                    if (!!def.shared)
-                        slot.InheritanceInfo[field] = fieldSymbol;
+                    let fnDI = slot.DeclarationInfo[0];
+                    if (!(fieldName in fnDI)) {
+                        let {field, def} = getFieldDef({[fieldName]: value}, fieldName, true);
+                        let fieldSymbol = Symbol(field.toString());
+                        if (def.private) {
+                            Object.defineProperty(fnDI, field, {
+                                configurable: true,
+                                value: fieldSymbol
+                            });
+                            Object.defineProperty(slot.PrivateValues, fieldSymbol, def);
+                        }
+                        else {
+                            Object.defineProperty(fn, field, def);
+                        }
+                        if (!!def.shared)
+                            slot.InheritanceInfo[field] = fieldSymbol;
+                    }
                 }
             }
         }

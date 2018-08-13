@@ -17,6 +17,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         console.log(`field1 = ${this['#'].field1}`);
                         console.log(`field2 = ${this['#'].field2}`);
                         console.log(`field3 = ${this.field3}`);
+                        console.log(`field4 = ${this.constructor['#'].field4}`);
                         console.log(`method1 = ${this['#'].method1.toString()}`);
                         console.log(`method2 = ${this.method2.toString()}`);
                     },
@@ -25,6 +26,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         console.log(`field1 = ${this['#'].field1}`);
                         console.log(`field2 = ${this['#'].field2}`);
                         console.log(`field3 = ${this.field3}`);
+                        console.log(`field4 = ${this.constructor['#'].field4}`);
                         console.log(`method1 = ${this['#'].method1}`);
                         console.log(`method2 = ${this.method2}`);
                     },
@@ -59,7 +61,11 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         expect(failed).toBeTruthy;
                     },
                     constructor: function Factory() {
-                        Privacy.staticField(factory.constructor, "private counter", 0);
+                        Privacy.staticField(factory, "public privateStaticFieldCounter", () => {
+                            return this['#'].counter;
+                        });
+                        Privacy.staticField(factory, "counter", 0);
+                        ++this.constructor['#'].counter;
                     }
                 });
             });
@@ -83,10 +89,20 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                 expect(factoryInstance.hasOwnProperty("method1")).toBeFalsy();
             });
 
+            test("Private static members should not be seen as members from outside", () => {
+                expect(factory.hasOwnProperty("field4")).toBeFalsy();
+            });
+
             test("Private members can exist along side public members of the same name", () => {
                 expect(() => { factoryInstance.field1 = 42; }).not.toThrow();
                 expect(factoryInstance.privateField1 != factoryInstance.field1).toBeTruthy();
                 expect(() => { delete factoryInstance.field1; }).not.toThrow();
+            });
+
+            test("Private static members can exist along side public static members of the same name", () => {
+                expect(() => { factory.field4 = 42; }).not.toThrow();
+                expect(factory.privateStaticField4 != factory.field4).toBeTruthy();
+                expect(() => { delete factory.field4; }).not.toThrow();
             });
 
             test("Newly added methods should not have access to private data", () => {

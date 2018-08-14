@@ -118,7 +118,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
         });
         describe("Internal access checks", () => { 
             test("All members should be visible from the inside", () => {
-                expect(() => { debugger; factoryInstance.doMethod1()}).not.toThrow();
+                expect(() => { factoryInstance.doMethod1()}).not.toThrow();
                 expect(() => { factoryInstance.method2()}).not.toThrow();
             });
 
@@ -143,7 +143,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
         describe("External access checks", () => {
             test("Object definition inheriting object with 'private' and 'protected' members does not fail", () => {
                 subFactory = Privacy({
-                    __proto__: factory,
+                    __proto__: factory.prototype,
                     ['private field4']: 'found field4',
                     method2() {
                         super.method2();
@@ -158,12 +158,12 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         }
                         catch (e) {}
                         expect(field1).toBeUndefined();
-                        expect(this['#'].field2).toBe("changed field2");
+                        expect(this['#'].field2).toBe("found field2");
                         expect(this['#'].field4).toBe("found field4");
                     },
                     testSuite6() {
-                        this['#'].field2 = "found field2"; 
-                        expect(this['#'].field2).toBe("found field2");
+                        this['#'].field2 = "changed field2"; 
+                        expect(this['#'].field2).toBe("changed field2");
                         this['#'].field4 = "changed field4";
                         expect(this['#'].field4).toBe("changed field4");
                     },
@@ -203,9 +203,15 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         expect(failed).toBeTruthy;
                     },
                     constructor: function SubFactory() {
-                        Privacy.staticField(factory.constructor, "private counter", 0);
+                        Reflect.construct(factory, [], subFactory);
                     }
                 });
+            });
+
+            test("Should be able to construct an instance of a factory", () => {
+                expect(() => { subFactoryInstance = new subFactory(); }).not.toThrow();
+                expect(subFactoryInstance instanceof subFactory).toBeTruthy();
+                expect(subFactoryInstance instanceof factory).toBeTruthy();
             });
 
             test("Operator '#' should not be available from outside", () => {

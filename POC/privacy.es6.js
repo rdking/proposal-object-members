@@ -329,7 +329,7 @@ var Privacy = (() => {
                     if (typeof(def[prop]) == "function") {
                         let p = def[prop];
                         changed = true;
-                        if (key == "constructor") {
+                        if (hasCtor && (key == "constructor")) {
                             def[prop] = new Proxy(p, handler);
                             let ctorSlot = handler.slots.get(p);
                             handler.slots.set(def[prop], ctorSlot);

@@ -386,12 +386,28 @@ var Privacy = (() => {
                 var pv = (arguments[1] && handler.canAccess(arguments[1])) ? handler.slots.get(arguments[1]) : null;
 
                 if (typeof(obj) != "function")
-                    throw new TypeError("Cannot wrap non-function for inheritance.");
+                    throw new TypeError("Cannot wrap non-functions");
 
-                if (!handler.slots.has(obj))
-                    handler.slots.set(obj, { PrivateValues: (pv) ? pv.PrivateValues : {}, 
-                                             DeclarationInfo: (pv) ? pv.DeclarationInfo : [{}],
-                                             InheritanceInfo: (pv) ? pv.InheritanceInfo : {} });
+                if (!handler.slots.has(obj)) {
+                    let slot;
+                    if (pv) {
+                        slot = Object.assign({
+                            PrivateValues: {}, 
+                            DeclarationInfo: [{}],
+                            InheritanceInfo: {},
+                            className: (pv.constructor) ? pv.constructor.name : "Object"
+                        }, pv);
+                    }
+                    else {
+                        slot = {
+                            PrivateValues: {}, 
+                            DeclarationInfo: [{}],
+                            InheritanceInfo: {}
+                        };
+                    }
+                    handler.slots.set(obj, slot);
+                }
+
                 if (!pv && obj.prototype && !handler.slots.has(obj.prototype))
                     handler.slots.set(obj.prototype, { PrivateValues: {}, 
                                                        DeclarationInfo: [{}],

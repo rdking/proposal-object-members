@@ -1,26 +1,32 @@
 var Privacy = require('../privacy.es6');
 
-describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with constructor", () => {
+describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
     var factory;
     var factoryInstance;
     var subFactory;
     var subFactoryInstance;
     describe("Object with default prototype", () => {
         describe("External access checks", () => {
-            test("Object definition with 'private' and/or 'protected' members does not fail", () => {
-                factory = Privacy({
-                    ['private field1']: "found field1",
-                    ['protected field2']: "found field2",
-                    field3: "found field3",
-                    ['private method1']() {
-                        console.log("As seen from method1");
-                        console.log(`field1 = ${this['#'].field1}`);
-                        console.log(`field2 = ${this['#'].field2}`);
-                        console.log(`field3 = ${this.field3}`);
-                        console.log(`field4 = ${this.constructor['#'].counter}`);
-                        console.log(`method1 = ${this['#'].method1.toString()}`);
-                        console.log(`method2 = ${this.method2.toString()}`);
-                    },
+            test("Class definition with 'private' and/or 'protected' members does not fail", () => {
+                factory = Privacy(class Factory {
+                    static [Privacy.DATA]() {
+                        return {
+                            ['private field1']: "found field1",
+                            ['protected field2']: "found field2",
+                            field3: "found field3",
+                            ['private method1']() {
+                                console.log("As seen from method1");
+                                console.log(`field1 = ${this['#'].field1}`);
+                                console.log(`field2 = ${this['#'].field2}`);
+                                console.log(`field3 = ${this.field3}`);
+                                console.log(`field4 = ${this.constructor['#'].counter}`);
+                                console.log(`method1 = ${this['#'].method1.toString()}`);
+                                console.log(`method2 = ${this.method2.toString()}`);
+                            },
+                            ['static private counter']: 0
+                        };
+                    }
+
                     method2() {
                         console.log("As seen from method2");
                         console.log(`field1 = ${this['#'].field1}`);
@@ -29,27 +35,33 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         console.log(`field4 = ${this.constructor['#'].counter}`);
                         console.log(`method1 = ${this['#'].method1}`);
                         console.log(`method2 = ${this.method2}`);
-                    },
+                    }
+
                     doMethod1() {
                         this['#'].method1();
-                    },
-                    get privateField1() { return this['#'].field1; },
+                    }
+
+                    get privateField1() { return this['#'].field1; }
+
                     testSuite1() {
                         expect(this['#'].field1).toBe("found field1");
                         expect(this['#'].field2).toBe("found field2");
-                    },
+                    }
+
                     testSuite2() {
                         this['#'].field1 = "changed field1"; 
                         expect(this['#'].field1).toBe("changed field1");
                         this['#'].field2 = "changed field2";
                         expect(this['#'].field2).toBe("changed field2");
-                    },
+                    }
+
                     testSuite3() {
                         'use strict';
                         expect(Privacy.wrap(() => {
                             delete this['#'].field1;
-                        }, this.constructor)).toThrow();
-                    },
+                        })).toThrow();
+                    }
+
                     testSuite4() {
                         var failed = false;
                         try {
@@ -59,14 +71,13 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                             failed = true;
                         }
                         expect(failed).toBeTruthy;
-                    },
-                    constructor: function Factory() {
-                        Privacy.staticField(factory, "public privateStaticCounter",
-                            Privacy.wrap(() => {
-                                return this.constructor['#'].counter;
-                            }, this.constructor)
-                        );
-                        Privacy.staticField(factory, "counter", 0);
+                    }
+
+                    get privateStaticFieldCounter() {
+                        return this['#'].counter;
+                    }
+
+                    constructor() {
                         ++this.constructor['#'].counter;
                     }
                 });
@@ -102,9 +113,9 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
             });
 
             test("Private static members can exist along side public static members of the same name", () => {
-                expect(Privacy.wrap(() => { factory.counter = 42; }, factory)).not.toThrow();
-                expect(factory.privateStaticCounter() != factory.counter).toBeTruthy();
-                expect(() => { delete factory.counter; }).not.toThrow();
+                expect(() => { factory.field4 = 42; }).not.toThrow();
+                expect(factory.privateStaticField4 != factory.field4).toBeTruthy();
+                expect(() => { delete factory.field4; }).not.toThrow();
             });
 
             test("Newly added methods should not have access to private data", () => {
@@ -144,14 +155,20 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
     describe("Object with other object having private members as prototype", () => {
         describe("External access checks", () => {
             test("Object definition inheriting object with 'private' and 'protected' members does not fail", () => {
-                subFactory = Privacy({
-                    __proto__: factory.prototype,
-                    ['private field4']: 'found field4',
+                subFactory = Privacy(class SubFactory extends Factory {
+                    static [Privacy.DATA]() {
+                        return {
+                            ['private field4']: 'found field4'
+                        };
+                    }
+
                     method2() {
                         super.method2();
                         console.log(`field4 = ${this['#'].field4}`);
-                    },
-                    get privateField4() { return this['#'].field4; },
+                    }
+
+                    get privateField4() { return this['#'].field4; }
+
                     testSuite5() {
                         var field1;
 
@@ -162,19 +179,22 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         expect(field1).toBeUndefined();
                         expect(this['#'].field2).toBe("found field2");
                         expect(this['#'].field4).toBe("found field4");
-                    },
+                    }
+
                     testSuite6() {
                         this['#'].field2 = "changed field2"; 
                         expect(this['#'].field2).toBe("changed field2");
                         this['#'].field4 = "changed field4";
                         expect(this['#'].field4).toBe("changed field4");
-                    },
+                    }
+
                     testSuite7() {
                         'use strict';
                         expect(Privacy.wrap(() => {
                             delete this['#'].field1;
                         })).toThrow();
-                    },
+                    }
+
                     testSuite8() {
                         var failed = false;
                         try {
@@ -184,7 +204,8 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                             failed = true;
                         }
                         expect(failed).toBeTruthy;
-                    },
+                    }
+
                     testSuite9() {
                         var failed = false;
                         try {
@@ -203,9 +224,10 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                             failed = true;
                         }
                         expect(failed).toBeTruthy;
-                    },
-                    constructor: function SubFactory() {
-                        Reflect.construct(factory, [], subFactory);
+                    }
+
+                    constructor() {
+                        super();
                     }
                 });
             });

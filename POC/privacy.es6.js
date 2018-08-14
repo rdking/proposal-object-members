@@ -7,19 +7,29 @@ var Privacy = (() => {
     const CONTEXT = Symbol("CONTEXT");
     const SUPER = Symbol("SUPER");
 
-    if (Error.prepareStackTrace) {
-        function prepareStackTrace(err, trace) {
-            var retval;
+    function getStackTrace() {
+        var retval = {};
+        if (Error.hasOwnProperty("prepareStackTrace")) {
+            let original = Error.prepareStackTrace;
+            function prepareStackTrace(err, trace) {
+                var retval;
 
-            err.stackTrace = trace;
-            if (typeof(prepareStackTrace.original) == "function")
-                retval = prepareStackTrace.original(err, trace);
+                err.stackTrace = trace;
+                if (typeof(original) == "function") {
+                    retval = original.bind(Error)(err, trace);
+                    Error.prepareStackTrace = original;
+                }
 
-            return retval;
+                return retval;
+            }
+            Error.prepareStackTrace = prepareStackTrace;
+            ({ stack: retval.stack, stackTrace: retval.stackTrace } = new Error());
+        }
+        else {
+            retval.stack = (new Error()).stack;
         }
 
-        prepareStackTrace.original = Error.prepareStackTrace.bind(Error);
-        Error.prepareStackTrace = prepareStackTrace;
+        return retval;
     }
 
     function proxyCheck(obj) { //Necessary since prototypes report as well...
@@ -39,22 +49,26 @@ var Privacy = (() => {
             //It's only approximate and can be spoofed under the right conditions.
             var retval;
             if (this.stack.length) {
-                let err = new Error();
+                let err = getStackTrace();
                 let currentFn = this.stack[this.stack.length-1];
                 let cfnPvt = this.slots.get(currentFn); 
                 if (err.stackTrace) {
-                    let frame = err.stackTrace[3];
+                    let frame = err.stackTrace[4];
                     let frameFn = (frame) ? frame.getFunction() : undefined;
+                    let frameFnName = frame.getFunctionName();
                     if (((typeof(frameFn) == "function") && (frameFn === currentFn)) || 
-                        (frame.getFunctionName() == currentFn.name) ||
-                        ((currentFn.name.length === 0) && /<anonymous>/.test(frame.getFunctionName()))) {
+                        (frameFnName == currentFn.name) ||
+                        ((currentFn.name.length === 0) &&
+                         (/<anonymous>/.test(frameFnName) ||
+                         (frameFnName.includes(cfnPvt.className) && (/\.Privacy\.wrap/.test(frameFnName)))))) {
                         retval = cfnPvt.DeclarationInfo;
                     }
                 }
                 else {
-                    let eStack = (new Error()).stack.split('\n');
+                    let frame = err.stack.split('\n')[5];
                     let regex = new RegExp(`${currentFn.name || "<anonymous>"}`);
-                    if (regex.test(eStack[4]))
+                    if (regex.test(frame) ||
+                        (frame.includes(cfnPvt.className) && (/\.Privacy\.wrap\s+/.test(frame))))
                         retval = cfnPvt.DeclarationInfo;
                 }
             }

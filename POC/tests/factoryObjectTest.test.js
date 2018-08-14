@@ -102,7 +102,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
             });
 
             test("Private static members can exist along side public static members of the same name", () => {
-                expect(Privacy.wrap(() => { factory.counter = 42; }, factory)).not.toThrow();
+                expect(() => { factory.counter = 42; }).not.toThrow();
                 expect(factory.privateStaticCounter() != factory.counter).toBeTruthy();
                 expect(() => { delete factory.counter; }).not.toThrow();
             });

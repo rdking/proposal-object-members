@@ -78,6 +78,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
                     }
 
                     constructor() {
+                        debugger;
                         ++this.constructor['#'].counter;
                     }
                 });

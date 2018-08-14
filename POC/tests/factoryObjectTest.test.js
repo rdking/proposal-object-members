@@ -17,7 +17,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         console.log(`field1 = ${this['#'].field1}`);
                         console.log(`field2 = ${this['#'].field2}`);
                         console.log(`field3 = ${this.field3}`);
-                        console.log(`field4 = ${this.constructor['#'].field4}`);
+                        console.log(`field4 = ${this.constructor['#'].counter}`);
                         console.log(`method1 = ${this['#'].method1.toString()}`);
                         console.log(`method2 = ${this.method2.toString()}`);
                     },
@@ -26,7 +26,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
                         console.log(`field1 = ${this['#'].field1}`);
                         console.log(`field2 = ${this['#'].field2}`);
                         console.log(`field3 = ${this.field3}`);
-                        console.log(`field4 = ${this.constructor['#'].field4}`);
+                        console.log(`field4 = ${this.constructor['#'].counter}`);
                         console.log(`method1 = ${this['#'].method1}`);
                         console.log(`method2 = ${this.method2}`);
                     },
@@ -71,7 +71,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
             });
 
             test("Should be able to construct an instance of a factory", () => {
-                expect(() => { debugger; factoryInstance = new factory(); }).not.toThrow();
+                expect(() => { factoryInstance = new factory(); }).not.toThrow();
                 expect(factoryInstance instanceof factory).toBeTruthy();
             });
 
@@ -118,7 +118,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
         });
         describe("Internal access checks", () => { 
             test("All members should be visible from the inside", () => {
-                expect(() => { factoryInstance.doMethod1()}).not.toThrow();
+                expect(() => { debugger; factoryInstance.doMethod1()}).not.toThrow();
                 expect(() => { factoryInstance.method2()}).not.toThrow();
             });
 

@@ -356,17 +356,25 @@ var Privacy = (() => {
 
         if (ctor && (DATA in ctor))
             delete ctor[DATA];
-
-        for (let di of staticSlot.DeclarationInfo)
-            Object.preventExtensions(di);
-        Object.preventExtensions(staticSlot.InheritanceInfo);
-        for (let di of privateSlot.DeclarationInfo)
-            Object.preventExtensions(di);
-        Object.preventExtensions(privateSlot.InheritanceInfo);
         
         var retval = (ctor) ? proto.constructor || new Proxy(ctor, handler) : new Proxy(proto, handler);
         if (!ctor) {
             handler.slots.set(retval, privateSlot);
+        }
+        else {
+            /**
+             * This little trick allows factories processed by Privacy to work
+             * properly when used with HTML Custom Elements.
+             */
+            let rval = retval;
+            retval = eval(`(function ${rval.name}(...args) {
+                if (!new.target)
+                    throw new TypeError("Constructor ${rval.name} requires new");
+                return new rval(args);
+            })`);
+            Object.defineProperty(retval, '#', { get() { return rval['#']; } });
+            retval.prototype = rval.prototype;
+            handler.slots.set(retval, handler.slots.get(rval));
         }
         return retval;
     };

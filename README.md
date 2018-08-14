@@ -87,11 +87,14 @@ To completely level the playing field, two more notations will be allowed:
 function ExampleFn() {
   /* private */static field = 1; //The `private` keyword is implied by the scope and therefore useless.
   protected static field2 = 2;
+  public static field = 3; //This allows functions object to make privileged public static members.
   console.log(`last sum = ${ExampleFn#.field1++ + ExampleFn#.field2++}`);
   console.log(`new sum = ${ExampleFn#.field1 + ExampleFn#.field2}`);
 }
 ```
-The end result of this notation allows the function to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. While this feature is at first glance somewhat similar to the functionality of a generator, it is in fact very different, and a necessary feature for ensuring that fully featured constructor functions can still be generated without the help of the `class` keyword. See the [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) section for more information. Access to such members can be made through the `#` operator with the owning `function` as the left parameter. Use of the `protected` keyword in this scope without the `static` keyword for a given variable declaration results in a `SyntaxError`.
+This notation allows the function to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. While this feature is at first glance somewhat similar to the functionality of a generator, it is in fact very different, and a necessary feature for ensuring that fully featured constructor functions can still be generated without the help of the `class` keyword. See the [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) section for more information. 
+
+Access to such members can be made through the `#` operator with the owning `function` as the left parameter. Use of the `protected` keyword in this scope without the `static` keyword for a given variable declaration results in a `SyntaxError`. Since a closure is an inherently private space, the `private` keyword is not required when declaring a `private static` field. However, because this would leave no means of declaring a `public static` field, this becomes the one and only use case where `public` serves a function.
 
 Missing from the above function examples are the use of `async` and `*`(to define a generator). It is the intention of this proposal that these also be supported. The `private` and `protected` keywords are meant to provide a privilege level to any and all possible forms of member variable, property, and function declaration that make sense within a class or object. Given the arguments that have led to [proposal-class-fields](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
 ```javascript
@@ -156,67 +159,26 @@ class Example {
 
 Loosely Translated to ES6:
 ```javascript
-//Pre-defined globally
-const Class = (function() {
-  const privMap = new WeakMap();
-  return function Class(fn) {
-    //Ignore the leakyness of this example
-    return fn(privMap);
+//See the POC folder for details on this library
+var Privacy = require("privacy.es6");
+
+let Example = Privacy(class Example {
+  static Privacy[DATA]() {
+    return {
+      ['private field1']: 'alpha',
+      ['static private field2']: 0,
+      ['protected field3']: '42',
+      ['static protected field4']: "You can see me!"
+    };
   }
-})();
-
-const Example = Class(function(privMap) {
-  const field1 = Symbol("field1");
-  const field2 = Symbol("field2");
-  const field3 = Symbol("field3");
-  const field4 = Symbol("field4");
   
-  var retval = class Example {
-    constructor() {
-      if (!new.target) {
-        throw new TypeError("Constructor Example requires 'new'");
-      }
-
-      //If Example extended something, super() would go here
-      const __constructor_priv__ = privMap.get(this.constructor);
-      privMap.set(this, Object.create(__constructor_priv__.privProto));
-
-      //Your "super()"-less constructor code here...
-    }
-  
-    print() {
-      if (!(privMap.has(this) && privMap.has(this.constructor)) {
-        throw new TypeError("Function 'print' called without instance of 'Example' as the context");
-      }
-      
-      const __priv__ = privMap.get(this); 
-      const __constructor_priv__ = privMap.get(this.constructor);
-      console.log(`field1 = ${__priv__[field1]}`);
-      console.log(`field2 = ${__constructor_priv__[field2]}`);
-      console.log(`field3 = ${__priv__[field3]}`);
-      console.log(`field4 = ${__constructor_priv__[field4]}`);
-    }
-  };
-  
-  privMap.set(retval, {
-    protNames: {
-      field3
-    },
-    protStaticNames: {
-      field4
-    },
-    privProto: {
-      [field1]: 'alpha',
-      [field3]: 42
-    },
-    privStaticData: {
-      [field2]: 0,
-      [field4]: "You can see me!"
-    }
-  });
-  
-  return retval;
-});
+  print() {
+    console.log(`field1 = ${this['#'].field1}`);
+    console.log(`field2 = ${this.constructor['#'].field2}`);
+    console.log(`field3 = ${this['#']['field3']}`); //Yes, obj#.x === obj#['x']
+    console.log(`field4 = ${this.constructor['#'].field4}`);
+  }
+})
 ```
 
 If we were to inherit from the example above:
@@ -236,57 +198,21 @@ class SubExample extends Example {
 ```
 it might roughly translate to the following:
 ```javascript
-const SubExample = Class(function(privMap) {
-  if (!(privMap && privMap.has(SubExample))) {
-    throw new TypeError("Class extends value Example is not a constructor or null");
+let SubExample = Privacy(class SubExample extends Example {
+  static Privacy[DATA]() {
+    return {
+        ['private field5']: "Hello from the SubExample!"
+      };
+    }
+  
+  constructor() {
+    super();
   }
-  const field3 = privMap.get(SubExample).protNames.field3;
-  const field4 = privMap.get(SubExample).protStaticNames.field4;
-  const field5 = Symbol("field5");
   
-  var retval = class SubExample extends Example {
-    constructor() {
-      if (!new.target) {
-        throw new TypeError("Constructor Example requires 'new'");
-      }
-      
-      var retval = Reflect.construct(Example, arguments, SubExample); // === super();
-      const __constructor_priv__ = privMap.get(retval.constructor);
-      privMap.set(retval, Object.create(__constructor_priv__.privProto));
-      
-      //Your "super()"-less constructor code here...
-      return retval;
-    }
-  
-    print() {
-      if (!privMap.has(this)) {
-        throw new TypeError("Function 'print' called without instance of 'Example' as the context");
-      }
-      
-      const __priv__ = privMap.get(this); 
-      const __constructor_priv__ = privMap.get(this.constructor);
-      Object.getPrototypeOf(Object.getPrototypeOf(this)).print.call(this);
-      console.log(`field5 = ${__priv__[field5]}`);
-    }
-  };
-  
-  privMap.set(retval, {
-    protNames: {
-      __proto__: privMap.get(SubExample).protNames
-    },
-    protStaticNames: {
-      __proto__: privMap.get(SubExample).protStaticNames
-    },
-    privProto: {
-      [field5]: "Hello from the SubExample!",
-      __proto__: privMap.get(SubExample).privProto
-    },
-    privStaticData: {
-      __proto__: privMap.get(SubExample).privStaticData
-    }
-  });
-  
-  return retval;
+  print() {
+    super.print();
+    console.log(`field5 = ${this['#'].field5}`);
+  }
 });
 ```
 

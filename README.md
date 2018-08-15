@@ -1,6 +1,10 @@
 # Object members proposal
 
 ## Goal
+
+This proposal is to provide functional support for access modifiers on object memmbers, namely `private`, `protected`, & `public`, as well as a "private container access operator" (`#`) to ES. 
+
+
 ES, being a prototype based language, has matured to the point that it is being used to create full desktop and web applications. It now has support for the `class` keyword, making it far simpler to create object factory hierarchies. The main problem with `class` is that it currently doesn't support adding data, let alone private or protected data. Given that the intent of the `class` keyword was to create a simplified syntax for the well-documented process for creating object hierarchies via prototype inheritance, the absense of the ability to put data members into the `class` definition is sorely missed. Further, given that this data usually constitutes implementation details as opposed to being part of the public interface, and that some of these implementation details must be shared amongs descendant classes, there is a definite need for both `private` and `protected` members among the member data. That is what this proposal seeks to provide.
 
 ## Rationale

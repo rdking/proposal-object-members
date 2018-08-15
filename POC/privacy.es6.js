@@ -266,7 +266,7 @@ var Privacy = (() => {
 
     var retval = function Privacy(obj) {
         var isFn = typeof(obj) == "function";
-        var hasCtor = (!isFn && obj.hasOwnProperty("constructor") && obj.constructor.hasOwnProperty("prototype"));
+        var hasCtor = isFn || (obj.hasOwnProperty("constructor") && obj.constructor.hasOwnProperty("prototype"));
 
         //Make sure that if we got a non-function, it's set up right...
         if (!isFn) {

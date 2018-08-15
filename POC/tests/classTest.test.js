@@ -8,7 +8,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
     describe("Object with default prototype", () => {
         describe("External access checks", () => {
             test("Class definition with 'private' and/or 'protected' members does not fail", () => {
-                factory = Privacy(class Factory {
+                factory = Privacy(class Factory extends Privacy.wrap(Object) {
                     static [Privacy.DATA]() {
                         return {
                             ['private field1']: "found field1",
@@ -78,7 +78,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
                     }
 
                     constructor() {
-                        debugger;
+                        super();
                         ++this.constructor['#'].counter;
                     }
                 });
@@ -156,7 +156,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
     describe("Object with other object having private members as prototype", () => {
         describe("External access checks", () => {
             test("Object definition inheriting object with 'private' and 'protected' members does not fail", () => {
-                subFactory = Privacy(class SubFactory extends Factory {
+                subFactory = Privacy(class SubFactory extends factory {
                     static [Privacy.DATA]() {
                         return {
                             ['private field4']: 'found field4'
@@ -235,6 +235,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
 
             test("Should be able to construct an instance of a factory", () => {
                 expect(() => { subFactoryInstance = new subFactory(); }).not.toThrow();
+                debugger;
                 expect(subFactoryInstance instanceof subFactory).toBeTruthy();
                 expect(subFactoryInstance instanceof factory).toBeTruthy();
             });

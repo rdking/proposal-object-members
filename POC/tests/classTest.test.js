@@ -235,7 +235,6 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
 
             test("Should be able to construct an instance of a factory", () => {
                 expect(() => { subFactoryInstance = new subFactory(); }).not.toThrow();
-                debugger;
                 expect(subFactoryInstance instanceof subFactory).toBeTruthy();
                 expect(subFactoryInstance instanceof factory).toBeTruthy();
             });

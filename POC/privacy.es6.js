@@ -384,11 +384,12 @@ var Privacy = (() => {
             retval = eval(`(function ${rval.name}(...args) {
                 if (!new.target)
                     throw new TypeError("Constructor ${rval.name} requires new");
-                return new rval(args);
+                return Reflect.construct(rval, args, new.target);
             })`);
             Object.defineProperty(retval, '#', { get() { return rval['#']; } });
-            retval.prototype = rval.prototype;
-            handler.slots.set(retval, handler.slots.get(rval));
+            retval.prototype = (proxyCheck(rval.prototype)) ? rval.prototype : new Proxy(rval.prototype, handler);
+            handler.slots.set(retval.prototype, privateSlot);
+            handler.slots.set(retval, staticSlot);
         }
         return retval;
     };

@@ -1,5 +1,5 @@
 {
-  "name": "poc",
+  "name": "privacy",
   "version": "1.0.0",
   "description": "Proof of concept for new Object Members proposal",
   "main": "privacy.es6.js",

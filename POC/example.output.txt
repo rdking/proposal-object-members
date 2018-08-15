@@ -1,0 +1,35 @@
+/usr/local/bin/node --inspect-brk=28089 POC/example.js 
+Debugger listening on ws://127.0.0.1:28089/a3b29389-6674-48d7-936a-68279b27dcd0
+Debugger attached.
+Testing basic classes...                                                       example.js:3
+field1 = alpha                                                                 example.js:23
+field2 = 0                                                                     example.js:24
+field3 = 42                                                                    example.js:25
+field4 = You can see me!                                                       example.js:26
+                                                                               example.js:35
+Testing subclasses...
+According to the superclass...                                                 example.js:54
+field1 = alpha                                                                 example.js:23
+field2 = 0                                                                     example.js:24
+field3 = 21                                                                    example.js:25
+field4 = You can see me!                                                       example.js:26
+According to the subclass...                                                   example.js:56
+Non-interferring masking is possible as well.                                  example.js:42
+The old "field3" is still '42'!                                                example.js:43
+test2.yes = You can always see me!                                             example.js:63
+SubExample.no = undefined                                                      example.js:64
+                                                                               example.js:66
+Testing objects...
+field1 = signs point to yes                                                    example.js:72
+field2 = seems likely                                                          example.js:73
+field3 = absolutely                                                            example.js:74
+                                                                               example.js:80
+Testing object inheritance...
+I should be able to see field 2 from here...                                   example.js:85
+field1 = new and improved                                                      example.js:87
+field2 = seems likely... not!                                                  example.js:88
+field3 = absolutely                                                            example.js:89
+And the old stuff is still there too!                                          example.js:90
+field1 = signs point to yes                                                    example.js:72
+field2 = seems likely... not!                                                  example.js:73
+field3 = absolutely                                                            example.js:74

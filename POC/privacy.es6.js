@@ -1,9 +1,36 @@
+'use strict';
+
 var Privacy = (() => {
     const IS_PROXY = Symbol("IS_PROXY");
     const IS_PV = Symbol("IS_PV");
     const DATA = Symbol("DATA");
     const CONTEXT = Symbol("CONTEXT");
     const SUPER = Symbol("SUPER");
+
+    function getStackTrace() {
+        var retval = {};
+        if (Error.hasOwnProperty("prepareStackTrace")) {
+            let original = Error.prepareStackTrace;
+            function prepareStackTrace(err, trace) {
+                var retval;
+
+                err.stackTrace = trace;
+                if (typeof(original) == "function") {
+                    retval = original.bind(Error)(err, trace);
+                    Error.prepareStackTrace = original;
+                }
+
+                return retval;
+            }
+            Error.prepareStackTrace = prepareStackTrace;
+            ({ stack: retval.stack, stackTrace: retval.stackTrace } = new Error());
+        }
+        else {
+            retval.stack = (new Error()).stack;
+        }
+
+        return retval;
+    }
 
     function proxyCheck(obj) { //Necessary since prototypes report as well...
         'use strict';
@@ -22,12 +49,28 @@ var Privacy = (() => {
             //It's only approximate and can be spoofed under the right conditions.
             var retval;
             if (this.stack.length) {
+                let err = getStackTrace();
                 let currentFn = this.stack[this.stack.length-1];
                 let cfnPvt = this.slots.get(currentFn); 
-                let eStack = (new Error()).stack.split('\n');
-                let regex = new RegExp(`\\s*at\\s+(Proxy\\.|new\\s+)${currentFn.name || "<anonymous>"}\\s+\\([\\w/\\\\\\-\\.]+:\\d+:\\d+\\)`);
-                if (regex.test(eStack[4]))
-                    retval = cfnPvt.DeclarationInfo;
+                if (err.stackTrace) {
+                    let frame = err.stackTrace[4];
+                    let frameFn = (frame) ? frame.getFunction() : undefined;
+                    let frameFnName = frame.getFunctionName();
+                    if (((typeof(frameFn) == "function") && (frameFn === currentFn)) || 
+                        (frameFnName == currentFn.name) ||
+                        ((currentFn.name.length === 0) &&
+                         (/<anonymous>/.test(frameFnName) ||
+                         (frameFnName.includes(cfnPvt.className) && (/\.Privacy\.wrap/.test(frameFnName)))))) {
+                        retval = cfnPvt.DeclarationInfo;
+                    }
+                }
+                else {
+                    let frame = err.stack.split('\n')[5];
+                    let regex = new RegExp(`${currentFn.name || "<anonymous>"}`);
+                    if (regex.test(frame) ||
+                        (frame.includes(cfnPvt.className) && (/\.Privacy\.wrap\s+/.test(frame))))
+                        retval = cfnPvt.DeclarationInfo;
+                }
             }
             return retval;
         },
@@ -42,7 +85,7 @@ var Privacy = (() => {
 
             if (methodDI) {
                 for (let di of diList) {
-                    thisDI = methodDI.find((value) => {
+                    let thisDI = methodDI.find((value) => {
                         return (value === di) || (value.isPrototypeOf(di)) || (di.isPrototypeOf(value));
                     });
                     if (thisDI)
@@ -52,7 +95,7 @@ var Privacy = (() => {
 
             return !!exists;
         },
-        getPrivateValue(target, key) {
+        getPrivateName(target, key) {
             let pvtKey = undefined;
             let diList = target.DeclarationInfo;
             let thisDI = undefined;
@@ -75,33 +118,12 @@ var Privacy = (() => {
                 throw new TypeError(`Current method does not have access to private members of ${target.className}`);
             }
 
-            if (key in thisDI)
-                pvtKey = thisDI[key];
+            pvtKey = thisDI[key];
 
             if (!(pvtKey in thisPV))
                 throw new ReferenceError(`Cannot access non-existent private key ${key}`);
 
-            return thisPV[pvtKey];
-        },
-        setPrivateValue(target, key, value) {
-            let pvtKey = undefined;
-            let thisDI = target.DeclarationInfo[0];
-            let thisPV = target.PrivateValues;
-            let methodDI = this.getCallerDI();
-
-            if (!(methodDI && methodDI.find((value) => {
-                return (value === thisDI) || (thisDI.isPrototypeOf(value));
-            }))) {
-                throw new TypeError(`Current method does not have access to private members of ${target.className}`);
-            }
-
-            if (key in thisDI)
-                pvtKey = thisDI[key];
-
-            if (!(pvtKey in thisPV))
-                throw new ReferenceError(`Cannot access non-existent private key ${key}`);
-            
-            thisPV[pvtKey] = value;
+            return pvtKey;
         },
         get(target, key, receiver) {
             var retval;
@@ -112,20 +134,33 @@ var Privacy = (() => {
             else if (key === CONTEXT) {
                 retval = target[CONTEXT];
             }
-            else if ((key === '#') && this.canAccess(opTarget)) {
-                retval = new Proxy({ [CONTEXT]: receiver, __proto__: this.slots.get(opTarget) }, this);
+            else if (key === '#') {
+                if (this.canAccess(opTarget)) {
+                    retval = new Proxy({ [CONTEXT]: receiver, __proto__: this.slots.get(opTarget) }, this);
+                }
+                else {
+                    throw new ReferenceError(`Cannot access private data from invalid scope.`);
+                }
             }
             else if (target[IS_PV] && (key !== IS_PV)) {
-                retval = this.getPrivateValue(target, key);
+                retval = target.PrivateValues[this.getPrivateName(target, key)];
             }
             else {
                 retval = Reflect.get(target, key, receiver);
             }
 
+            if ((key === "toString") && (retval === Function.prototype.toString))
+                retval = retval.bind(target);
+
             return retval;
         },
         set(target, key, value, receiver) {
-            (target[IS_PV]) ? this.setPrivateValue(target, key, value) : Reflect.set(target, key, value, receiver);
+            if (target[IS_PV]) {
+                target.PrivateValues[this.getPrivateName(target, key)] = value;
+            }
+            else {
+                Reflect.set(target, key, value, receiver);
+            }
             return true;
         },
         stageInstance(instance) {
@@ -135,15 +170,15 @@ var Privacy = (() => {
                 this.slots.set(instance, {
                     [IS_PV]: true,
                     PrivateValues: Object.create(pv.PrivateValues),
-                    DeclarationInfo: [pv.DeclarationInfo[0]]
+                    DeclarationInfo: pv.DeclarationInfo
                 });
             }
             else {
                 let rpv = this.slots.get(instance);
                 if (!pv.PrivateValues.isPrototypeOf(rpv.PrivateValues))
                     Object.setPrototypeOf(rpv.PrivateValues, pv.PrivateValues);
-                if (pv.DeclarationInfo[0] !== rpv.DeclarationInfo[0])
-                    rpv.DeclarationInfo[0] = pv.DeclarationInfo[0];
+                if (pv.DeclarationInfo !== rpv.DeclarationInfo)
+                    rpv.DeclarationInfo = pv.DeclarationInfo;
             }
         },
         construct(target, args, newTarget) {
@@ -163,16 +198,25 @@ var Privacy = (() => {
         },
         apply(target, context, args) {
             this.stack.push(target);
-            var pContext = (context[IS_PV])? context[CONTEXT] : (proxyCheck(context)) ? context : new Proxy(context, handler);
+            var pContext = (!context) ? context : (context[IS_PV])? context[CONTEXT] : (proxyCheck(context)) ? context : new Proxy(context, handler);
             var retval = Reflect.apply(target, pContext, args);
             this.stack.pop();
+            return retval;
+        },
+        deleteProperty(target, key) {
+            var retval = false;
+            if (!target[IS_PV])
+                retval = Reflect.deleteProperty(target, key);
             return retval;
         }
     };
 
-    function getFieldDef(ctorData, field) {
+    function getFieldDef(ctorData, field, inFn) {
         var def = Object.getOwnPropertyDescriptor(ctorData, field);
-        def.writable = true;
+        if ("value" in def)
+            def.writable = true;
+
+        def.private = !!inFn;
 
         if (typeof(field) !== "symbol") {
             let parts = field.split(' ');
@@ -181,10 +225,15 @@ var Privacy = (() => {
                 switch (part) {
                     case "private":
                         def.private = true;
+                        def.shared = false;
                         break;
                     case "protected":
                         def.private = true;
                         def.shared = true;
+                        break;
+                    case "public":
+                        def.private = false;
+                        def.shared = false;
                         break;
                     case "static":
                         def.static = true;
@@ -200,15 +249,16 @@ var Privacy = (() => {
         return {field, def};
     }
 
-    function inheritDeclarations(list) {
+    function inheritDeclarations(ps) {
+        var list = ps.DeclarationInfo;
         var retval = [];
 
-        for (let item of list) {
-            retval.push(Object.create(item));
-        }
+        retval.push(Object.create(ps.InheritanceInfo || Object.prototype));
 
-        if (!retval.length) {
-            retval.push({});
+        if (list) {
+            for (let item of list) {
+                retval.push(item);
+            }
         }
 
         return retval;
@@ -216,18 +266,14 @@ var Privacy = (() => {
 
     var retval = function Privacy(obj) {
         var isFn = typeof(obj) == "function";
-        var hasCtor = (!isFn && obj.hasOwnProperty("constructor"));
+        var hasCtor = isFn || (obj.hasOwnProperty("constructor") && obj.constructor.hasOwnProperty("prototype"));
 
         //Make sure that if we got a non-function, it's set up right...
         if (!isFn) {
-            //let oProto = Object.getPrototypeOf(obj);
-            // if (!proxyCheck(oProto))
-            //     Object.setPrototypeOf(obj, Privacy.wrap(oProto));
             if (hasCtor) {
                 if (obj.constructor.prototype !== obj) {
                     obj.constructor.prototype = obj;
                 }
-                obj = obj.constructor;
             }
         }
 
@@ -236,15 +282,15 @@ var Privacy = (() => {
         var proto = (isFn) ? ctor.prototype : obj;
         var sProto = (ctor) ? Object.getPrototypeOf(ctor.prototype) : Object.getPrototypeOf(proto);
         var parent = (sProto) ? (ctor) ? sProto.constructor : (proxyCheck(sProto)) ? sProto : null : null;
-        var parentStaticSlot = (ctor) ? (parent) ? handler.slots.get(parent) : {} : {};
-        var parentPrivateSlot = (parent) ? handler.slots.get((ctor) ? parent.prototype : parent) : {};
+        var parentStaticSlot = (ctor) ? (parent) ? handler.slots.get(parent) || {} : {} : {};
+        var parentPrivateSlot = (parent) ? handler.slots.get((ctor) ? parent.prototype : parent) || {} : {};
         var staticSlot = { [IS_PV]: true, className: (ctor) ? ctor.name || "<anonymous>" : "<anonymous>",
                            PrivateValues: { __proto__: parentStaticSlot.PrivateValues || Object.prototype },
-                           DeclarationInfo: inheritDeclarations(parentStaticSlot.DeclarationInfo || []),
+                           DeclarationInfo: inheritDeclarations(parentStaticSlot),
                            InheritanceInfo: { __proto__: parentStaticSlot.InheritanceInfo || Object.prototype } };
         var privateSlot = { [IS_PV]: true, className: (ctor) ? ctor.name || "<anonymous>" : "<anonymous>",
                             PrivateValues: { __proto__: parentPrivateSlot.PrivateValues || Object.prototype },
-                            DeclarationInfo: inheritDeclarations(parentPrivateSlot.DeclarationInfo || []), 
+                            DeclarationInfo: inheritDeclarations(parentPrivateSlot), 
                             InheritanceInfo: { __proto__: parentPrivateSlot.InheritanceInfo || Object.prototype } };
         var cdProto = { [SUPER]: true };
         var pcdProto = new Proxy(cdProto, handler);
@@ -256,8 +302,11 @@ var Privacy = (() => {
             let isStatic = def.static;
             let slot = (isStatic) ? staticSlot : privateSlot;
             if (def.private) {
-                let fieldSymbol = Symbol(field.toString())
-                slot.DeclarationInfo[0][field] = fieldSymbol;
+                let fieldSymbol = Symbol(field.toString());
+                Object.defineProperty(slot.DeclarationInfo[0], field, {
+                    configurable: true,
+                    value: fieldSymbol
+                });
                 Object.defineProperty(slot.PrivateValues, fieldSymbol, def);
                 if (!!def.shared)
                     slot.InheritanceInfo[field] = fieldSymbol;
@@ -272,11 +321,13 @@ var Privacy = (() => {
 
         if (ctor)
             handler.slots.set(ctor, staticSlot);
-        handler.slots.set(proto, privateSlot);
-        if (parentPrivateSlot) {
-            handler.slots.set(cdProto, parentPrivateSlot);
-            handler.slots.set(pcdProto, parentPrivateSlot);
+
+        if (sProto) {
+            handler.slots.set(cdProto, privateSlot);
+            handler.slots.set(pcdProto, privateSlot);
         }
+        handler.slots.set(proto, privateSlot);
+
         if (ctor && (DATA in ctor))
             Object.setPrototypeOf(ctorData, pcdProto);
 
@@ -292,7 +343,7 @@ var Privacy = (() => {
                     if (typeof(def[prop]) == "function") {
                         let p = def[prop];
                         changed = true;
-                        if (key == "constructor") {
+                        if (hasCtor && (key == "constructor")) {
                             def[prop] = new Proxy(p, handler);
                             let ctorSlot = handler.slots.get(p);
                             handler.slots.set(def[prop], ctorSlot);
@@ -319,10 +370,26 @@ var Privacy = (() => {
 
         if (ctor && (DATA in ctor))
             delete ctor[DATA];
-
+        
         var retval = (ctor) ? proto.constructor || new Proxy(ctor, handler) : new Proxy(proto, handler);
         if (!ctor) {
             handler.slots.set(retval, privateSlot);
+        }
+        else {
+            /**
+             * This little trick allows factories processed by Privacy to work
+             * properly when used with HTML Custom Elements.
+             */
+            let rval = retval;
+            retval = eval(`(function ${rval.name}(...args) {
+                if (!new.target)
+                    throw new TypeError("Constructor ${rval.name} requires new");
+                return Reflect.construct(rval, args, new.target);
+            })`);
+            Object.defineProperty(retval, '#', { get() { return rval['#']; } });
+            retval.prototype = (proxyCheck(rval.prototype)) ? rval.prototype : new Proxy(rval.prototype, handler);
+            handler.slots.set(retval.prototype, privateSlot);
+            handler.slots.set(retval, staticSlot);
         }
         return retval;
     };
@@ -331,20 +398,62 @@ var Privacy = (() => {
         "DATA": { value: DATA },
         wrap: {
             value: function wrap(obj) {
-                if (typeof(obj) != "function")
-                    throw new TypeError("Cannot wrap non-function for inheritance.");
+                var pv = (arguments[1] && handler.canAccess(arguments[1])) ? handler.slots.get(arguments[1]) : null;
 
-                if (!handler.slots.has(obj))
-                    handler.slots.set(obj, { PrivateValues: Object.prototype, 
-                                             DeclarationInfo: [Object.prototype],
-                                             InheritanceInfo: Object.prototype });
-                if (obj.prototype && !handler.slots.has(obj.prototype))
-                    handler.slots.set(obj.prototype, { PrivateValues: Object.prototype, 
-                                                       DeclarationInfo: [Object.prototype],
-                                                       InheritanceInfo: Object.prototype });
+                if (typeof(obj) != "function")
+                    throw new TypeError("Cannot wrap non-functions");
+
+                if (!handler.slots.has(obj)) {
+                    let slot;
+                    if (pv) {
+                        slot = Object.assign({
+                            PrivateValues: {}, 
+                            DeclarationInfo: [{}],
+                            InheritanceInfo: {},
+                            className: (pv.constructor) ? pv.constructor.name : "Object"
+                        }, pv);
+                    }
+                    else {
+                        slot = {
+                            PrivateValues: {}, 
+                            DeclarationInfo: [{}],
+                            InheritanceInfo: {}
+                        };
+                    }
+                    handler.slots.set(obj, slot);
+                }
+
+                if (!pv && obj.prototype && !handler.slots.has(obj.prototype))
+                    handler.slots.set(obj.prototype, { PrivateValues: {}, 
+                                                       DeclarationInfo: [{}],
+                                                       InheritanceInfo: {} });
                 
                 var retval = (proxyCheck(obj)) ? obj : new Proxy(obj, handler);
                 return retval;
+            }
+        },
+        staticField: {
+            value: function staticField(fn, fieldName, value) {
+                if (handler.slots.has(fn)) {
+                    let slot = handler.slots.get(fn);
+                    let fnDI = slot.DeclarationInfo[0];
+                    if (!(fieldName in fnDI)) {
+                        let {field, def} = getFieldDef({[fieldName]: value}, fieldName, true);
+                        let fieldSymbol = Symbol(field.toString());
+                        if (def.private) {
+                            Object.defineProperty(fnDI, field, {
+                                configurable: true,
+                                value: fieldSymbol
+                            });
+                            Object.defineProperty(slot.PrivateValues, fieldSymbol, def);
+                        }
+                        else {
+                            Object.defineProperty(fn, field, def);
+                        }
+                        if (!!def.shared)
+                            slot.InheritanceInfo[field] = fieldSymbol;
+                    }
+                }
             }
         }
     });

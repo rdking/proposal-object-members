@@ -6,7 +6,11 @@ ES, being a prototype based language, has matured to the point that it is being 
 ## Rationale
 One of the main reasons ES developers even bothered to construct their own class factories in ES5 was to hide implementation details from the users of their class factories. While the `_name` convention may have been nice, and sucessfully got many a programmer to respect functions and member data marked this way as private, it did nothing to stop many developers from ignoring the convention, creating software with various security/usability issues, unduely constraining the flexibility of the library developer, and, in some cases, damaging the reputation of the abused library.
 
-This is the reason we need `private` and `protected`. Their existance will allow developers to properly hide what should be hidden from their users. For those who (quite rightly) think this will interfere with their ability to monkey patch code, you should really be filing feature requests and possibly code patches with the library developer to extend its usability and flexibility. Not only do you help the community by doing that, you also prevent yourself from getting "locked in" to a specific version of that library. Put another way, if you can monkey patch, you can submit a patch!
+This is the reason we need `private` and `protected`. Their existence will allow developers to properly hide what should be hidden from their users. For those who (quite rightly) think this will interfere with their ability to monkey patch code, you should really be filing feature requests and possibly code patches with the library developer to extend its usability and flexibility. Not only do you help the community by doing that, you also prevent yourself from getting "locked in" to a specific version of that library. Put another way, if you can monkey patch, you can submit a patch!
+
+With regards to `protected` something must first be understood, it doesn't really protect anything. The problem occurs because ES is a dynamic language. At any time, any code can create an object that inherits another object. Since any object that inherits a particular prototype can manipulate the protected members of any other object inheriting that same prototype, nothing can be done to prevent malicious code from accessing the protected members of any object. As a matter of fact, this is also an issue for statically compiled code. The only difference is the speed with which such code can be developed.
+
+However, absolutely hiding members is not the purpose of the `protected` feature. The main purpose of `protected` is to provide a clear, declarative, soft-privacy that partitions an object's internal API from its external API. This can be thought of as a technical formalization of the underscore convention that is prevelant in existing code bases for use in sharing API between objects. Since no protected member will ever appear to be a public member of the object, there's no chance of accidental use of an internal API. In order to make use of an object's internal API, the developer must deliberately inherit from that object.
 
 ## Existing proposals
 This proposal covers ground in ES for which there are already existing proposals, namely:
@@ -83,11 +87,14 @@ To completely level the playing field, two more notations will be allowed:
 function ExampleFn() {
   /* private */static field = 1; //The `private` keyword is implied by the scope and therefore useless.
   protected static field2 = 2;
+  public static field = 3; //This allows functions object to make privileged public static members.
   console.log(`last sum = ${ExampleFn#.field1++ + ExampleFn#.field2++}`);
   console.log(`new sum = ${ExampleFn#.field1 + ExampleFn#.field2}`);
 }
 ```
-The end result of this notation allows the function to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. While this feature is at first glance somewhat similar to the functionality of a generator, it is in fact very different, and a necessary feature for ensuring that fully featured constructor functions can still be generated without the help of the `class` keyword. See the [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) section for more information. Access to such members can be made through the `#` operator with the owning `function` as the left parameter. Use of the `protected` keyword in this scope without the `static` keyword for a given variable declaration results in a `SyntaxError`.
+This notation allows the function to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. While this feature is at first glance somewhat similar to the functionality of a generator, it is in fact very different, and a necessary feature for ensuring that fully featured constructor functions can still be generated without the help of the `class` keyword. See the [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) section for more information. 
+
+Access to such members can be made through the `#` operator with the owning `function` as the left parameter. Use of the `protected` keyword in this scope without the `static` keyword for a given variable declaration results in a `SyntaxError`. Since a closure is an inherently private space, the `private` keyword is not required when declaring a `private static` field. However, because this would leave no means of declaring a `public static` field, this becomes the one and only use case where `public` serves a function.
 
 Missing from the above function examples are the use of `async` and `*`(to define a generator). It is the intention of this proposal that these also be supported. The `private` and `protected` keywords are meant to provide a privilege level to any and all possible forms of member variable, property, and function declaration that make sense within a class or object. Given the arguments that have led to [proposal-class-fields](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
 ```javascript
@@ -125,8 +132,13 @@ Given code like `obj#.field`, ES should perform the following steps:
 
 See [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) for an explanation of the terms between the double braces (`[[ ]]`).
 
-#### The `private` and `protected` keywords
-These keywords declare `private` members in much the same way as you would expect if you were implementing `private` data using a `WeakMap`. A short example should make it clear.
+#### The `private` keyword
+The `private` keyword declares members in much the same way as you would expect if you were implementing `private` data using a `WeakMap`. The `private` keyword will provide a simple means of implementing a "hard-private" interface. Nothing outside the declaring object will ever have access to any member declared `private` unless the declaring object provides for such. 
+
+#### The `protected` keyword
+The `protected` keyword declares members that are "soft-private" so as to allow them to be shared with inheriting objects. Because of the "soft-privacy" of `protected`, **_nothing declared as such should be considered as private information_**. ES is a dynamic language making privacy an all or nothing situation. What `protected` instead offers is API separation. By declaring fields as `protected` those fields will not appear on the public interface of the object. Instead, they will appear as public members of the object's `private` interface. In this way, methods declared in both the declaring object and other objects using the declaring object as a prototype will be able to access these members.
+
+The examples below should make the usage of both `private` and `protected` clear.
 
 With this proposal's syntax:
 ```javascript
@@ -147,66 +159,26 @@ class Example {
 
 Loosely Translated to ES6:
 ```javascript
-//Pre-defined globally
-const Class = (function() {
-  const privMap = new WeakMap();
-  return function Class(fn) {
-    return fn(privMap);
+//See the POC folder for details on this library
+var Privacy = require("privacy.es6");
+
+let Example = Privacy(class Example {
+  static Privacy[DATA]() {
+    return {
+      ['private field1']: 'alpha',
+      ['static private field2']: 0,
+      ['protected field3']: '42',
+      ['static protected field4']: "You can see me!"
+    };
   }
-})();
-
-const Example = Class(function(privMap) {
-  const field1 = Symbol("field1");
-  const field2 = Symbol("field2");
-  const field3 = Symbol("field3");
-  const field4 = Symbol("field4");
   
-  var retval = class Example {
-    constructor() {
-      if (!new.target) {
-        throw new TypeError("Constructor Example requires 'new'");
-      }
-
-      //If Example extended something, super() would go here
-      const __constructor_priv__ = privMap.get(this.constructor);
-      privMap.set(this, Object.create(__constructor_priv__.privProto));
-
-      //Your "super()"-less constructor code here...
-    }
-  
-    print() {
-      if (!(privMap.has(this) && privMap.has(this.constructor)) {
-        throw new TypeError("Function 'print' called without instance of 'Example' as the context");
-      }
-      
-      const __priv__ = privMap.get(this); 
-      const __constructor_priv__ = privMap.get(this.constructor);
-      console.log(`field1 = ${__priv__[field1]}`);
-      console.log(`field2 = ${__constructor_priv__[field2]}`);
-      console.log(`field3 = ${__priv__[field3]}`);
-      console.log(`field4 = ${__constructor_priv__[field4]}`);
-    }
-  };
-  
-  privMap.set(retval, {
-    protNames: {
-      field3
-    },
-    protStaticNames: {
-      field4
-    },
-    privProto: {
-      [field1]: 'alpha',
-      [field3]: 42
-    },
-    privStaticData: {
-      [field2]: 0,
-      [field4]: "You can see me!"
-    }
-  });
-  
-  return retval;
-});
+  print() {
+    console.log(`field1 = ${this['#'].field1}`);
+    console.log(`field2 = ${this.constructor['#'].field2}`);
+    console.log(`field3 = ${this['#']['field3']}`); //Yes, obj#.x === obj#['x']
+    console.log(`field4 = ${this.constructor['#'].field4}`);
+  }
+})
 ```
 
 If we were to inherit from the example above:
@@ -226,57 +198,21 @@ class SubExample extends Example {
 ```
 it might roughly translate to the following:
 ```javascript
-const SubExample = Class(function(privMap) {
-  if (!(privMap && privMap.has(SubExample))) {
-    throw new TypeError("Class extends value Example is not a constructor or null");
+let SubExample = Privacy(class SubExample extends Example {
+  static Privacy[DATA]() {
+    return {
+        ['private field5']: "Hello from the SubExample!"
+      };
+    }
+  
+  constructor() {
+    super();
   }
-  const field3 = privMap.get(SubExample).protNames.field3;
-  const field4 = privMap.get(SubExample).protStaticNames.field4;
-  const field5 = Symbol("field5");
   
-  var retval = class SubExample extends Example {
-    constructor() {
-      if (!new.target) {
-        throw new TypeError("Constructor Example requires 'new'");
-      }
-      
-      var retval = Reflect.construct(Example, arguments, SubExample); // === super();
-      const __constructor_priv__ = privMap.get(retval.constructor);
-      privMap.set(retval, Object.create(__constructor_priv__.privProto));
-      
-      //Your "super()"-less constructor code here...
-      return retval;
-    }
-  
-    print() {
-      if (!privMap.has(this)) {
-        throw new TypeError("Function 'print' called without instance of 'Example' as the context");
-      }
-      
-      const __priv__ = privMap.get(this); 
-      const __constructor_priv__ = privMap.get(this.constructor);
-      Object.getPrototypeOf(Object.getPrototypeOf(this)).print.call(this);
-      console.log(`field5 = ${__priv__[field5]}`);
-    }
-  };
-  
-  privMap.set(retval, {
-    protNames: {
-      __proto__: privMap.get(SubExample).protNames
-    },
-    protStaticNames: {
-      __proto__: privMap.get(SubExample).protStaticNames
-    },
-    privProto: {
-      [field5]: "Hello from the SubExample!",
-      __proto__: privMap.get(SubExample).privProto
-    },
-    privStaticData: {
-      __proto__: privMap.get(SubExample).privStaticData
-    }
-  });
-  
-  return retval;
+  print() {
+    super.print();
+    console.log(`field5 = ${this['#'].field5}`);
+  }
 });
 ```
 
@@ -292,15 +228,17 @@ Every object will contain 3 new slots:
 * one for declaration info (`[[DeclarationInfo]]`)
 * one for inheritance info (`[[InheritanceInfo]]`)
 
-`[[PrivateValues]]` will contain a single sealed record, the key/value pairs of which will be all of the `private` and `protected` symbols associated with the object and their corresponding default values as well as a `__proto__: null` pair. This serves as the storage for all `private` and `protected` data. `[[InheritanceInfo]]` will contain a single frozen record, the key/value pairs of which are the declared `[[Identifier Name]]` and corresponding `Symbol` value of the `protected` members of the object as well as a `__proto__: null` pair. This serves as the list of inheritable names.
+`[[PrivateValues]]` will contain a single record, the key/value pairs of which will be the private `Symbol` name and associated data for all of the `private` and `protected` fields as well as a `__proto__: null` pair. `[[PrivateValues]]` serves as the storage record for all `private` and `protected` data. Each member will be added as non-configurable. The `__proto__` will be set to the `[[PrivateValues]]` of the parent object after all `private` and `protected` declarations have been added.
 
-`[[DeclarationInfo]]` will contain an array of frozen records, the key/value pairs of which are the declared `[[Identifier Name]]` and corresponding `Symbol` value of the `private` and `protected` members of the object as well as a `__proto__: null` pair. These serves as the list of known `private` fields. The first entry in the array must a record defining either the private scope (if needed) with the corresponding entry from the constructing factory's prototype (if any) as the `__proto__`, just the prototype entry, or null. Following entries will be from the constructing function (if any), and from every function in the scope chain (if the object is a function).
+`[[DeclarationInfo]]` will contain an array of records. The 1<sup>st</sup> of these records describes the private fields of the associated object. Each of the remaining records come from other object for which the current object has been granted access. Each `[[DeclarationInfo]]` object will have key/value pairs which will be the declared `[[Identifier Name]]` and corresponding private `Symbol` value of each `private` and `protected` member as well as a `__proto__: null` pair. Each record of the  `[[DeclarationInfo]]` array serves as a list of known `private` and `protected` fields that are valid given a particular scope and context pair. Each member of the 1<sup>st</sup> `[[DeclarationInfo]]` record will be added as non-configurable and read-only. The `__proto__` of the 1<sup>st</sup> record of the `[[DeclarationInfo]]` array will be set to the `[[InheritanceInfo]]` of the parent object after all `private` and `protected` declarations have been added.
 
-The prototype resulting from a `class` declaration is no different. Neither is the resulting constructor function. When `private` and `protected` members are declared `static` in a `class`, their information is added to the afore mentioned slots of the generated constructor. If they are not declared `static`, their information is added to the afore mentioned slots of the generated prototype object. All key/value pairs added to the `[[DeclarationInfo]]` or `[[InheritanceInfo]]` of any object are added as read-only. All key/value pairs added to the `[[PrivateValues]]` of a `class` prototype are added as read-only while those added to the constructor remain writable. Each function present in the object/`class` declaration is granted a reference to `[[DeclarationInfo]]` as the `__proto__` value of that function's own `[[DeclarationInfo]]`.
+`[[InheritanceInfo]]` will contain a single record, the key/value pairs of which are the declared `[[Identifier Name]]` and corresponding `Symbol` value of the `protected` members of the object as well as a `__proto__: null` pair. `[[InheritanceInfo]]` serves as the list of inheritable names. Each member will be added as non-configurable and read-only.  The `__proto__` will be set to the `[[InheritanceInfo]]` of the parent object after all `private` and `protected` declarations have been added.
 
-The `[[PrivateValues]]` of a function used in a `new` operation is used as the `private` and `protected` data for the `static` members of the `class` while the same record of the prototype is used as the `__proto__` value for the new `[[PrivateValues]]` record of every instance object created by the corresponding constructor. The corresponding `[[DeclarationInfo]]` for the new instance is simply copied from the prototype. The `[[InheritanceInfo]]` will remain `undefined`. When a `class` extends another, or inheritance via `Reflect.construct` is used, the `__proto__` field of the `[[PrivateValues]]` slot in both generated components of the newly derived `class` is assigned a reference to the corresponding records of the base `class`. Likewise, the 2 remaining slots of generated components receive the `[[InheritanceInfo]]` records of the base `class` as their `__proto__` reference. In this way, inheritance of the `protected` members of a `class` continues to follow the same prototypal paradigm already present in ES.
+Declaring an object within a given scope results in that object acquiring all `[[DeclarationInfo]]` records accessible via the containing scope. This **does not** include the `[[DeclarationInfo]]` records of other objects contained within the same scope. In this way, the object gains access to all private information accessible from the same scope. 
 
-The `[[PrivateValues]]` record of an object can only be constructed during the declaration of that object, and it is the desire of this proposal to maintain an API that allows developers to use all features of the language without specifically requiring the `class` keyword to be used. To this end, there must be a means of populating the `[[PrivateValues]]` of a `Function` object without needing the `class` keyword. That is why this proposal includes the ability to declare `static field;` and `protected static field;` within a `function` declaration. Such declarations will be executed at the time of `function` declaration and ignored during function execution. A fortunate side effect of this declaration style is that C-style static function variables will be added to the language naturally.
+Access checks are performed by searching for matching records in the `[[DeclarationInfo]]` arrays of the targeted object and requesting function. If a match is found and the match contains the requested `[[IdentifierName]]`, access is granted. If no matching record is found, or if the requested `[[IdentifierName]]` is not found in any of the matching records, then a TypeError is thrown.
+
+When using the `class` keyword to create an object factory, all non-`static` members that are declared either `private` or `protected` are applied to the prototype. Members that are declared both `static` and either `private` or `protected` are treated as though they are `static` members of the function's own lexical scope. This allows such members to be applied to the afore mentioned slots of the function object itself.
 
 ## The odd bits...
 There will be those who strongly disagree with the use of the `private` keyword without access notation that looks like `obj.field`. To them I say, "I agree. It doesn't feel quite right having that extra character in there." At the same time, I recognize that this is ES, which is a very different language than the ones from which we're borrowing the `class` concept. As such, we should be willing to expect some _reasonable_ concessions. I would rather concede the extra `#` in `obj#.field` for rational reasons like the need to not have private implementation details interfere with public interface mutation, than concede `private` in `private field` for emotional reasons like "it doesn't feel right".

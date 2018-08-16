@@ -2,19 +2,20 @@
 
 ## Goal
 
-This proposal is to provide functional support for access modifiers on object memmbers, namely `private`, `protected`, & `public`, as well as a "private container access operator" (`#`) to ES. 
+This proposal is to provide functional support for access modifiers on object memmbers, namely `private`, `protected`, & `public`, as well as a "private container access operator" (`#`) to ES. Support for `static` in conjunction with access modifiers is to be supported for function objects. The end result will be lexical declaration syntax for:
 
-
-ES, being a prototype based language, has matured to the point that it is being used to create full desktop and web applications. It now has support for the `class` keyword, making it far simpler to create object factory hierarchies. The main problem with `class` is that it currently doesn't support adding data, let alone private or protected data. Given that the intent of the `class` keyword was to create a simplified syntax for the well-documented process for creating object hierarchies via prototype inheritance, the absense of the ability to put data members into the `class` definition is sorely missed. Further, given that this data usually constitutes implementation details as opposed to being part of the public interface, and that some of these implementation details must be shared amongs descendant classes, there is a definite need for both `private` and `protected` members among the member data. That is what this proposal seeks to provide.
+* Fully encapsulated, hard-private fields accessible from an object
+* Soft-private fields accessible from an object or its descendants
+* Static fields at any access level accessible from a function object
 
 ## Rationale
-One of the main reasons ES developers even bothered to construct their own class factories in ES5 was to hide implementation details from the users of their class factories. While the `_name` convention may have been nice, and sucessfully got many a programmer to respect functions and member data marked this way as private, it did nothing to stop many developers from ignoring the convention, creating software with various security/usability issues, unduely constraining the flexibility of the library developer, and, in some cases, damaging the reputation of the abused library.
+Adding access levels to ES will provide developers with a clear, direct, and easy to understand means of modeling objects and their APIs using an approach familiar from other languages. Basing this paradigm on objects allows the feature to be used in both handwritten object factories and classes. The following should be understood when reading this proposal:
 
-This is the reason we need `private` and `protected`. Their existence will allow developers to properly hide what should be hidden from their users. For those who (quite rightly) think this will interfere with their ability to monkey patch code, you should really be filing feature requests and possibly code patches with the library developer to extend its usability and flexibility. Not only do you help the community by doing that, you also prevent yourself from getting "locked in" to a specific version of that library. Put another way, if you can monkey patch, you can submit a patch!
+* **`private`** - full encapsulation. Only accessible from declaring object's lexically included methods. Not an "ownProperty" of the object.
+* **`protected`** - accessible via lexically included methods of the declaring object and its descendants. Not an "ownProperty" of the object.
+* **`public`** - the default for any field added to any object.
 
-With regards to `protected` something must first be understood, it doesn't really protect anything. The problem occurs because ES is a dynamic language. At any time, any code can create an object that inherits another object. Since any object that inherits a particular prototype can manipulate the protected members of any other object inheriting that same prototype, nothing can be done to prevent malicious code from accessing the protected members of any object. As a matter of fact, this is also an issue for statically compiled code. The only difference is the speed with which such code can be developed.
-
-However, absolutely hiding members is not the purpose of the `protected` feature. The main purpose of `protected` is to provide a clear, declarative, soft-privacy that partitions an object's internal API from its external API. This can be thought of as a technical formalization of the underscore convention that is prevelant in existing code bases for use in sharing API between objects. Since no protected member will ever appear to be a public member of the object, there's no chance of accidental use of an internal API. In order to make use of an object's internal API, the developer must deliberately inherit from that object.
+The only reason `public` will be implemented is because unlike normal objects, a function's lexical scope (closure) is `private` by default. Declaring a public function having access to privileged fields on a function object without constantly re-declaring the function member requires that there be a means to do so lexically within the function closure that will only be processed once. Hence, `public` will be allowed for variable declarations within a function, but only when paired with `static`. Beyond this singular use case, `public` serves no purpose.
 
 ## Existing proposals
 This proposal covers ground in ES for which there are already existing proposals, namely:
@@ -89,18 +90,19 @@ var example = {
 To completely level the playing field, two more notations will be allowed:
 ```javascript
 function ExampleFn() {
-  /* private */static field = 1; //The `private` keyword is implied by the scope and therefore useless.
+  /* private */static field = 1; //`private` is implied by the scope
   protected static field2 = 2;
-  public static field = 3; //This allows functions object to make privileged public static members.
+  public static field = 3; //`public` allows exposing static fields
   console.log(`last sum = ${ExampleFn#.field1++ + ExampleFn#.field2++}`);
   console.log(`new sum = ${ExampleFn#.field1 + ExampleFn#.field2}`);
 }
 ```
 This notation allows the function to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. While this feature is at first glance somewhat similar to the functionality of a generator, it is in fact very different, and a necessary feature for ensuring that fully featured constructor functions can still be generated without the help of the `class` keyword. See the [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) section for more information. 
 
-Access to such members can be made through the `#` operator with the owning `function` as the left parameter. Use of the `protected` keyword in this scope without the `static` keyword for a given variable declaration results in a `SyntaxError`. Since a closure is an inherently private space, the `private` keyword is not required when declaring a `private static` field. However, because this would leave no means of declaring a `public static` field, this becomes the one and only use case where `public` serves a function.
+Access to such members can be made through the `#` operator with the owning `function` as the left parameter. Use of any access modifier keyword in this scope without the `static` keyword for a given variable declaration results in a `SyntaxError`. Since a closure is an inherently private space, the `private` keyword is not required when declaring a `private static` field. However, because this would leave no means of declaring a `public static` field, this becomes the one and only use case where `public` serves a function.
 
-Missing from the above function examples are the use of `async` and `*`(to define a generator). It is the intention of this proposal that these also be supported. The `private` and `protected` keywords are meant to provide a privilege level to any and all possible forms of member variable, property, and function declaration that make sense within a class or object. Given the arguments that have led to [proposal-class-fields](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
+Use of a single access modifier will not conflict with any other function modifiers. The `private` and `protected` keywords are meant to provide a access level to any and all possible forms of member variable, property, and function declaration that make sense within an object. Given the arguments that have led to [proposal-class-fields](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
+
 ```javascript
 class Example {
   private privField1 = "value";
@@ -246,7 +248,7 @@ When using the `class` keyword to create an object factory, all non-`static` mem
 
 ## The odd bits...
 There will be those who strongly disagree with the use of the `private` keyword without access notation that looks like `obj.field`. To them I say, "I agree. It doesn't feel quite right having that extra character in there." At the same time, I recognize that this is ES, which is a very different language than the ones from which we're borrowing the `class` concept. As such, we should be willing to expect some _reasonable_ concessions. I would rather concede the extra `#` in `obj#.field` for rational reasons like the need to not have private implementation details interfere with public interface mutation, than concede `private` in `private field` for emotional reasons like "it doesn't feel right".
-
+ƒƒƒ
 Besides, the use of WeakMaps for providing private data is already a well known use case. Those of us implementing such an approach are already aware that the private data exists in a separate object. As such, the mental model for the new syntax is quite simple: `obj#.field <-> [[WeakMap]].get(obj).field`. The internal reality will not be too different:
 `obj#.field <-> obj.[[PrivateValues]][obj.[[DeclarationInfo]].field]`. The same mapping will hold true for array notation (`[]`) as well.
 

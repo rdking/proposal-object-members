@@ -7,6 +7,35 @@ var Privacy = (() => {
     const CONTEXT = Symbol("CONTEXT");
     const SUPER = Symbol("SUPER");
 
+    function clone(obj) {
+        let retval = {};
+        let stack = [{ src: obj, dst: retval }];
+
+        while (stack.length) {
+            let { src, dst } = stack.pop();
+            let proto = Object.getPrototypeOf(src);
+            let keys = Object.getOwnPropertyNames(src).concat(Object.getOwnPropertySymbols(src));
+
+            for (let key of keys) {
+                let def = Object.getOwnPropertyDescriptor(src, key);
+                for (let opt of ["value", "get", "set"]) {
+                    if (def[opt] && !(typeof(def[opt]) in [ "function", "boolean", "number", "string", "symbol"])) {
+
+                    }
+                }
+            }
+        }
+
+
+            
+            if (proto) {
+                stack.push({ src: proto, dst: {} });
+
+            }
+        }
+
+    }
+
     function getStackTrace() {
         var retval = {};
         if (Error.hasOwnProperty("prepareStackTrace")) {
@@ -169,7 +198,7 @@ var Privacy = (() => {
             if (!this.slots.has(instance)) {
                 this.slots.set(instance, {
                     [IS_PV]: true,
-                    PrivateValues: Object.create(pv.PrivateValues),
+                    PrivateValues: Object.assign(pv.PrivateValues),
                     DeclarationInfo: pv.DeclarationInfo
                 });
             }

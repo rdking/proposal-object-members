@@ -25,11 +25,15 @@ This proposal covers ground in ES for which there are already existing proposals
 This proposal should be considered as inheriting the intent and some of the design of these pre-existing proposals. However, there are several critical differences between this proposal and the pre-existing proposals. These differences, I hope, will help to improve both the understanding and adoption of these features without unduely encumbering the language's optimizability or future extensibility. In the two subsections below, the phrase "existing proposal" refers to the proposal named in the section header.
 
 #### Compared to proposal-static-class-features...
-On its own, the existing proposal is virtually flawless. It provides exactly what one would expect from the syntax for a static class member. Wherein it allows for public `static` members to be added to a `class`, this proposal absorbs that functionality. However, the existing proposal is an extension of proposal-class-fields and inherits the issues therein. Unfortunately, the existing proposal also has a couple of issues all its own:
-* The existing proposal lacks the ability to provide an equivalent of `static #field;` in a function. This will prevent developers from taking advantage of the benefits of the new notation to create object factories with private `static` data stored in the private data slot of the constructor function as would be done for the equivalent `class`.
-  * The `static` keyword will be made available within the scope of a function as a means of declaring the `private` data for a function. The `static` keyword is preferred over the `private` keyword for this purpose specifically due to how it behaves.
+This proposal has few problems of its own, but inherits several by being tied to proposal-class fields.
+
+* The existing proposal lacks the ability to provide an equivalent of `static #field;` in a function. This limits what developers can do with factory functions. This increases the conplexity of creating a method on the factory constructor that has access to the private data of the factory-created object without constantly re-creating the function.
+
+  * The `static` keyword will be made available within the lexical scope of a function in conjunction with the access modifiers. 
+
 * The existing proposal, due to the lack of a `protected` equivalent in proposal-class fields, has no concept of a `protected static` declaration in the existing proposal.
-  * The `protected` keyword will be made available within the scope of a function as a means of declaring the inheritable `private` data for a function. It must be used in conjunction with the `static` keyword or a `SyntaxError` will occur.
+
+  * The `protected` keyword will be made available within the lexical scope of all objects. Within a function, this is a means of declaring the inheritable data for a function. Within a function, it must be used in conjunction with the `static` keyword or a `SyntaxError` will occur. 
 
 #### Compared to proposal-class-fields...
 The sheer amount effort that has been put into the existing proposal is formidable. It would be ill-adivsed at best to ignore the years of contemplation and discourse that has been poured into it. It is for this reason that the many issues and pitfalls that have been skillfully avoided in the existing proposal have been absorbed into this proposal. However, the existing proposal is not without its issues.

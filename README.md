@@ -65,12 +65,40 @@ The sheer amount effort that has been put into the existing proposal is formidab
   * The `protected` keyword will be used to define a field that can be accessed by descendant `class` instances but is not an own property of the object.
 
 ## Notation
-It's as simple as this:
-```js
-class Example {
-  <modifiers>? <access level>? <get/set>? identifierName
-}
-```
+The new syntax should be as follows:
+<pre>
+  <i>FunctionScopeAccessModifier</i>:
+    <b>public</b>
+    <b>protected</b>
+  <i>ObjectScopeAccessModifier</i>:
+    <b>protected</b>
+    <b>private</b>
+  <i>ClassElement</i>:
+    <i>MethodDefinition</i>
+    <b>static</b> <i>MethodDefinition</i>
+    <i>ObjectScopeAccessModifier</i> <i>MethodDefinition</i>
+    <i>ObjectScopeAccessModifier</i> <b>static</b> <i>MethodDefinition</i>
+    <i>VariableDeclaration</i>
+    <b>static</b> <i>VariableDeclaration</i>
+    <i>ObjectScopeAccessModifier</i> <i>VariableDeclaration</i>
+    <i>ObjectScopeAccessModifier</i> <b>static</b> <i>VariableDeclaration</i>
+  <i>PropertyDefinition</i>:
+    <i>IdentifierReference</i>
+    <i>CoverInitializedName</i>
+    <i>PropertyName</i> : AssignmentExpression
+    <i>MethodDefinition</i>
+    <i>ObjectScopeAccessModifier</i> <i>IdentifierReference</i>
+    <i>ObjectScopeAccessModifier</i> <i>CoverInitializedName</i>
+    <i>ObjectScopeAccessModifier</i> <i>PropertyName</i> : AssignmentExpression
+    <i>ObjectScopeAccessModifier</i> <i>MethodDefinition</i>
+  <i>VariableDeclaration</i>
+    <i>BindingIdentifier</i> <i>Initializer</i><sub>opt</sub>
+    <i>BindingPattern</i> <i>Initializer</i>
+    <b>static</b> <i>BindingIdentifier</i> <i>Initializer</i><sub>opt</sub>
+    <b>static</b> <i>BindingPattern</i> <i>Initializer</i>
+    <i>FunctionScopeAccessModifier</i> <b>static</b> <i>BindingIdentifier</i> <i>Initializer</i><sub>opt</sub>
+    <i>FunctionScopeAccessModifier</i> <b>static</b> <i>BindingPattern</i> <i>Initializer</i>
+</pre>
 
 
 I want to add the following possibilites to ES:

@@ -7,6 +7,15 @@ var Privacy = (() => {
     const CONTEXT = Symbol("CONTEXT");
     const SUPER = Symbol("SUPER");
 
+    function isSimpleObject(val) {
+        return !((val === null) ||
+               (val === undefined) ||
+               ([ "function", "boolean", "number", "string", "symbol" ].indexOf(typeof(val)) > -1)) &&
+               (!val.prototype || Array.isArray(val) ||
+               (val.prototype.constructor === Object) ||
+               !(/\{\s*\[\s*native\s+code\s*\]\s*\}/.test(val.prototype.constructor)));
+    }
+
     function clone(obj) {
         let retval = {};
         let stack = [{ src: obj, dst: retval }];
@@ -19,7 +28,8 @@ var Privacy = (() => {
             for (let key of keys) {
                 let def = Object.getOwnPropertyDescriptor(src, key);
                 for (let opt of ["value", "get", "set"]) {
-                    if (def[opt] && !(typeof(def[opt]) in [ "function", "boolean", "number", "string", "symbol"])) {
+                    let type = typeof(def[opt]);
+                    if (def[opt] && !isSimpleObject(type)) {
 
                     }
                 }

@@ -36,23 +36,44 @@ This proposal has few problems of its own, but inherits several by being tied to
   * The `protected` keyword will be made available within the lexical scope of all objects. Within a function, this is a means of declaring the inheritable data for a function. Within a function, it must be used in conjunction with the `static` keyword or a `SyntaxError` will occur. 
 
 #### Compared to proposal-class-fields...
-The sheer amount effort that has been put into the existing proposal is formidable. It would be ill-adivsed at best to ignore the years of contemplation and discourse that has been poured into it. It is for this reason that the many issues and pitfalls that have been skillfully avoided in the existing proposal have been absorbed into this proposal. However, the existing proposal is not without its issues.
+The sheer amount effort that has been put into the existing proposal is formidable. It would be ill-adivsed at best to ignore the amount of effort poured into it. However, the existing proposal is not without its issues.
 
 * The syntax, while ostensibly easy to understand is meeting with high resistance from many of those who are aware of and interested in affecting the proposal. See [issue #100](https://github.com/tc39/proposal-class-fields/issues/100).
-  * This proposal uses more familiar syntax to handle the declarations which is in keeping with expectations from users of other langauges with the `class` keyword. This makes the syntax more natural and familiar to developers. To simplify private member retrieval, an operator is provided that both retrieves the private member container and protects it from being unduely exposed.
-* The syntax of the existing proposal seems simple enough on the surface (just replace `_` with `#` and the language will do the rest). However, any attempt to understand the syntax leads to mental model conflicts that are inherent to the use of the syntax itself. See [the FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#but-doesnt-giving-thisx-and-thisx-different-semantics-break-an-invariant-of-current-syntax), [issue #104](https://github.com/tc39/proposal-class-fields/issues/104#issuecomment-396623715), [issue #77](https://github.com/tc39/proposal-class-fields/issues/77#issuecomment-360974968).
-  * Instead of using the sigil in a way that always has 2 of 3 different meanings (declaration token, access operator, `[[IdentifierName]]` character), it will instead be used only as an access operator, simplifying the understanding of how to use it.
-* The syntax of the existing proposal limits the prescribed features to usage of the `class` keyword. This is not in keeping with the fact that all of the present functionality of the `class` keyword can be used in ES6 without using the `class` keyword. Likewise, there are those who would want to be able to use a feature like that provided by the existing proposal without being required to use the `class` keyword. See [issue #77](https://github.com/tc39/proposal-class-fields/issues/77#issuecomment-361016935).
-  * The `private` and `protected` keywords will also be made available to object declarations. The `#` access operator will be made available to functions declared within an object literal declaration.
-* The existing proposal refuses to use the `private` keyword for fear that it "implies that access would be done with `this.x`" ([FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#why-arent-declarations-private-x)). This implication does not make sense given the fact that you can [model encapsulation using WeakMaps](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#how-can-you-model-encapsulation-using-weakmaps), a well known technique that requires accessing a separate object to retrieve the private members, and given that the existing proposal _desugars to using WeakMaps_. If that is how the existing proposal is to be mentally modelled, then it should also be obvious that the private fields of a `class` cannot be accessed via `this.x`.
-  * The `private` keyword will be used to define a `private` field instead of the `#`. The notation for access to a `private` field will become `obj#.field`, maintaining some semblance of the `obj.x` expectation since `obj#` retrieves the private data record.
+
+  * This proposal uses the well-known syntax and meanings for declaring fields with access levels making the learning curve small.
+  * This proposal provides a single operator for accessing non-public fields. This keeps access simple, consistent, and as obvious as possible.
+
+* Attempts to understand the syntax of the existing proposal leads to mental model conflicts that are inherent to the use of the syntax itself. See [the FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#but-doesnt-giving-thisx-and-thisx-different-semantics-break-an-invariant-of-current-syntax), [issue #104](https://github.com/tc39/proposal-class-fields/issues/104#issuecomment-396623715), [issue #77](https://github.com/tc39/proposal-class-fields/issues/77#issuecomment-360974968).
+  * Instead of using the sigil in a way that always has 2 of 3 different meanings (declaration token, access operator, `[[IdentifierName]]` character), it will instead be used only as an access operator.
+
+* The syntax of the existing proposal limits the new features to `class` declarations despite ES being a prototype-based language as opposed to a class-based one. See [issue #77](https://github.com/tc39/proposal-class-fields/issues/77#issuecomment-361016935).
+
+  * The access modifiers will be made available to object and function declarations.
+  * The `#` access operator will be made available to functions declared within an object literal declaration.
+
+* The existing proposal refuses to use the `private` keyword for fear that it "implies that access would be done with `this.x`" ([FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#why-arent-declarations-private-x)). This is despite the fact that you can [model encapsulation using WeakMaps](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#how-can-you-model-encapsulation-using-weakmaps), which also does not use a `this.x` notation.
+
+  * Access modifier keywords will be used to define non-public fields.
+  * Access notation will become `obj#.field` for non-public fields, maintaining some semblance of the `obj.field` expectation since `obj#` retrieves the private data record.
+
 * The syntax of the existing proposal breaks the common equality `this.x === this['x']` for private fields due to the fact that the `#` sigil is part of the `[[IdentifierName]]` of the private field. See [the FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#why-doesnt-thisx-access-the-private-field-named-x-given-that-thisx-does), [issue #74](https://github.com/tc39/proposal-class-fields/issues/74).
+
   * Computed field access has been restored such that `obj#.field === obj#['field']`.
-* The existing proposal lacks any concept of `protected`, making it difficult to share non-public information within `class` hierarchies. See [issue #86](https://github.com/tc39/proposal-class-fields/issues/86).
-  * The `protected` keyword wiill be used to define a `private` field that can be accessed by descendant `class` instances.
+
+* The existing proposal lacks any concept of `protected`, making it difficult to share API that must not be accessible from the own properties of an object. See [issue #86](https://github.com/tc39/proposal-class-fields/issues/86).
+
+  * The `protected` keyword will be used to define a field that can be accessed by descendant `class` instances but is not an own property of the object.
 
 ## Notation
-It's as simple as this, I want to add the following possibilites to ES:
+It's as simple as this:
+```js
+class Example {
+  <modifiers>? <access level>? <get/set>? identifierName
+}
+```
+
+
+I want to add the following possibilites to ES:
 ```javascript
 class Example {
   private privField1 = "value";

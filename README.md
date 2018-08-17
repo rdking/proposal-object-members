@@ -100,50 +100,26 @@ The new syntax should be as follows:
     <i>FunctionScopeAccessModifier</i> <b>static</b> <i>BindingPattern</i> <i>Initializer</i>
 </pre>
 
+In essense, this proposal intends to allow:
+* field declarations in `class` definitions,
+* access modifiers in any object or class declaration
+* access modifiers + `static` for any function-scoped `var` declaration
 
-I want to add the following possibilites to ES:
-```javascript
+```js
 class Example {
   private privField1 = "value";
-  private privField2() {}
-  private get privField3() {}
-  private set privField3(value) {}
-  private static privStaticField1 = "value";
-  private static privStaticField2() {}
-  private static get privStaticField3() {}
-  private static set privStaticField3(value) {}
-  protected protField1 = "value";
-  protected protField2() {}
-  protected get protField3() {}
-  protected set protField3(value) {}
-  protected static protStaticField1 = "value";
   protected static protStaticField2() {}
-  protected static get protStaticField3() {}
-  protected static set protStaticField3(value) {}
-  /* public */ field = "value"; //Note: The public keyword is useless and not part of the proposal.
-  /* public */ static field = "value"; //However, public data **is** part of the proposal.
+  field = "value"; //Note: public is default
 }
-```
 
-Since the debut of `class` in ES, there has also been an alternate way to perform the same actions. There is nothing in ES6 that you can do with `class` that cannot be done without `class` in the same spec version. This was accomplished by ensuring there was a parallel API that allowed object factories to perform the same actions. To continue this tradition, I'm also proposing these possibilities:
-```javascript
-var example = {
+var example2 = {
   private privField1: "value",
-  private privField2() {},
-  private get privField3() {},
-  private set privField3(value) {},
-  protected protField1: "value",
   protected protField2() {},
-  protected get protField3() {},
-  protected set protField3(value) {},
-  /* public */ field: "value" //Note: The public keyword is useless and not part of the proposal.
+  field: "value" //Note: public is default
 };
-```
 
-To completely level the playing field, two more notations will be allowed:
-```javascript
 function ExampleFn() {
-  /* private */static field = 1; //`private` is implied by the scope
+  static field = 1; //`private` is default
   protected static field2 = 2;
   public static field = 3; //`public` allows exposing static fields
   console.log(`last sum = ${ExampleFn#.field1++ + ExampleFn#.field2++}`);

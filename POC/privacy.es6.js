@@ -7,43 +7,14 @@ var Privacy = (() => {
     const CONTEXT = Symbol("CONTEXT");
     const SUPER = Symbol("SUPER");
 
-    function isSimpleObject(val) {
-        return !((val === null) ||
-               (val === undefined) ||
-               ([ "function", "boolean", "number", "string", "symbol" ].indexOf(typeof(val)) > -1)) &&
-               (!val.prototype || Array.isArray(val) ||
-               (val.prototype.constructor === Object) ||
-               !(/\{\s*\[\s*native\s+code\s*\]\s*\}/.test(val.prototype.constructor)));
-    }
-
     function clone(obj) {
-        let retval = {};
-        let stack = [{ src: obj, dst: retval }];
-
-        while (stack.length) {
-            let { src, dst } = stack.pop();
-            let proto = Object.getPrototypeOf(src);
-            let keys = Object.getOwnPropertyNames(src).concat(Object.getOwnPropertySymbols(src));
-
-            for (let key of keys) {
-                let def = Object.getOwnPropertyDescriptor(src, key);
-                for (let opt of ["value", "get", "set"]) {
-                    let type = typeof(def[opt]);
-                    if (def[opt] && !isSimpleObject(type)) {
-
-                    }
-                }
-            }
+        let retval = obj;
+        if (obj) {
+            retval = {};
+            Object.defineProperties(retval, Object.getOwnPropertyDescriptors(obj));
+            Object.setPrototypeOf(retval, Object.getPrototypeOf(obj));
         }
-
-
-            
-            if (proto) {
-                stack.push({ src: proto, dst: {} });
-
-            }
-        }
-
+        return retval;
     }
 
     function getStackTrace() {
@@ -208,7 +179,7 @@ var Privacy = (() => {
             if (!this.slots.has(instance)) {
                 this.slots.set(instance, {
                     [IS_PV]: true,
-                    PrivateValues: Object.assign(pv.PrivateValues),
+                    PrivateValues: clone(pv.PrivateValues),
                     DeclarationInfo: pv.DeclarationInfo
                 });
             }

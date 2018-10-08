@@ -1,4 +1,5 @@
 'use strict';
+var SoftProxy = require("./softproxy");
 
 var Privacy = (() => {
     const IS_PROXY = Symbol("IS_PROXY");
@@ -38,12 +39,10 @@ var Privacy = (() => {
 
 
             
-            if (proto) {
-                stack.push({ src: proto, dst: {} });
+        if (proto) {
+            stack.push({ src: proto, dst: {} });
 
-            }
         }
-
     }
 
     function getStackTrace() {
@@ -82,6 +81,7 @@ var Privacy = (() => {
 
     var handler = {
         slots: new WeakMap(),
+        xref: new WeakMap(),
         stack: [],
         getCallerDI() {
             //This only exists because Function.caller has been deprecated.
@@ -175,7 +175,7 @@ var Privacy = (() => {
             }
             else if (key === '#') {
                 if (this.canAccess(opTarget)) {
-                    retval = new Proxy({ [CONTEXT]: receiver, __proto__: this.slots.get(opTarget) }, this);
+                    retval = new SoftProxy({ [CONTEXT]: receiver, __proto__: this.slots.get(opTarget) }, this);
                 }
                 else {
                     throw new ReferenceError(`Cannot access private data from invalid scope.`);
@@ -214,7 +214,8 @@ var Privacy = (() => {
             }
             else {
                 let rpv = this.slots.get(instance);
-                if (!pv.PrivateValues.isPrototypeOf(rpv.PrivateValues))
+                if (!(pv.PrivateValues.isPrototypeOf(rpv.PrivateValues) || 
+                      (pv.PrivateValues === rpv.PrivateValues)))
                     Object.setPrototypeOf(rpv.PrivateValues, pv.PrivateValues);
                 if (pv.DeclarationInfo !== rpv.DeclarationInfo)
                     rpv.DeclarationInfo = pv.DeclarationInfo;
@@ -224,7 +225,7 @@ var Privacy = (() => {
             this.stack.push(target);
             var retval = Reflect.construct(target, args, newTarget);
             if (!proxyCheck(retval)) {
-                retval = new Proxy(retval, this);
+                retval = new SoftProxy(retval, this);
             }
             var proto = Object.getPrototypeOf(retval);
             if (!this.slots.has(proto)) {
@@ -237,7 +238,7 @@ var Privacy = (() => {
         },
         apply(target, context, args) {
             this.stack.push(target);
-            var pContext = (!context) ? context : (context[IS_PV])? context[CONTEXT] : (proxyCheck(context)) ? context : new Proxy(context, handler);
+            var pContext = (!context) ? context : (context[IS_PV])? context[CONTEXT] : (proxyCheck(context)) ? context : new SoftProxy(context, handler);
             var retval = Reflect.apply(target, pContext, args);
             this.stack.pop();
             return retval;
@@ -332,7 +333,7 @@ var Privacy = (() => {
                             DeclarationInfo: inheritDeclarations(parentPrivateSlot), 
                             InheritanceInfo: { __proto__: parentPrivateSlot.InheritanceInfo || Object.prototype } };
         var cdProto = { [SUPER]: true };
-        var pcdProto = new Proxy(cdProto, handler);
+        var pcdProto = new SoftProxy(cdProto, handler);
                             
         //Set the private data for the constructor and prototype
         var ctorDataKeys = Object.getOwnPropertyNames(ctorData).concat(Object.getOwnPropertySymbols(ctorData));
@@ -383,13 +384,13 @@ var Privacy = (() => {
                         let p = def[prop];
                         changed = true;
                         if (hasCtor && (key == "constructor")) {
-                            def[prop] = new Proxy(p, handler);
+                            def[prop] = new SoftProxy(p, handler);
                             let ctorSlot = handler.slots.get(p);
                             handler.slots.set(def[prop], ctorSlot);
                             ctorSlot.DeclarationInfo.push(privateSlot.DeclarationInfo[0]);
                         }
                         else {
-                            def[prop] = new Proxy(p, handler);
+                            def[prop] = new SoftProxy(p, handler);
                             let fnSlot = {
                                 [IS_PV]: true,
                                 className: (isFn) ? obj.name : "Object",
@@ -410,7 +411,7 @@ var Privacy = (() => {
         if (ctor && (DATA in ctor))
             delete ctor[DATA];
         
-        var retval = (ctor) ? proto.constructor || new Proxy(ctor, handler) : new Proxy(proto, handler);
+        var retval = (ctor) ? proto.constructor || new SoftProxy(ctor, handler) : new SoftProxy(proto, handler);
         if (!ctor) {
             handler.slots.set(retval, privateSlot);
         }
@@ -420,13 +421,58 @@ var Privacy = (() => {
              * properly when used with HTML Custom Elements.
              */
             let rval = retval;
-            retval = eval(`(function ${rval.name}(...args) {
-                if (!new.target)
-                    throw new TypeError("Constructor ${rval.name} requires new");
-                return Reflect.construct(rval, args, new.target);
-            })`);
-            Object.defineProperty(retval, '#', { get() { return rval['#']; } });
-            retval.prototype = (proxyCheck(rval.prototype)) ? rval.prototype : new Proxy(rval.prototype, handler);
+            let keys = Object.getOwnPropertyNames(rval).concat(Object.getOwnPropertySymbols(rval));
+            retval = retval.bind();
+            Object.defineProperties(retval, {
+                'name': {
+                    configurable: true,
+                    get() { return rval.name; }
+                },
+                '#': {
+                    get() { return rval['#']; }
+                },
+                'length': {
+                    configurable: true,
+                    get() { return rval.length; }
+                },
+                'prototype':{
+                    configurable: true,
+                    get() {
+                        var retval;
+                        if (proxyCheck(rval.prototype)) {
+                            retval = rval.prototype;
+                        }
+                        else if (handler.xref.has(rval.prototype)) {
+                            retval = handler.xref.get(rval.prototype);
+                        }
+                        else {
+                            retval = new SoftProxy(rval.prototype, handler);
+                            handler.xref.set(rval.prototype, retval);
+                        }
+                        return retval;
+                    }
+                },
+                'toString': {
+                    configurable: true,
+                    get() { return rval.toString(); }
+                }
+            });
+            for (let field of keys) {
+                if (!(field in retval)) {
+                    Object.defineProperty(retval, field, {
+                        enumerable: true,
+                        configurable: true,
+                        get() { return rval[field]; }
+                    });
+                }
+            }
+            // retval = eval(`(function ${rval.name}(...args) {
+            //     if (!new.target)
+            //         throw new TypeError("Constructor ${rval.name} requires new");
+            //     return Reflect.construct(rval, args, new.target);
+            // })`);
+            // Object.defineProperty(retval, '#', { get() { return rval['#']; } });
+            // rval.prototype = (proxyCheck(rval.prototype)) ? rval.prototype : new SoftProxy(rval.prototype, handler);
             handler.slots.set(retval.prototype, privateSlot);
             handler.slots.set(retval, staticSlot);
         }
@@ -467,7 +513,7 @@ var Privacy = (() => {
                                                        DeclarationInfo: [{}],
                                                        InheritanceInfo: {} });
                 
-                var retval = (proxyCheck(obj)) ? obj : new Proxy(obj, handler);
+                var retval = (proxyCheck(obj)) ? obj : new SoftProxy(obj, handler);
                 return retval;
             }
         },

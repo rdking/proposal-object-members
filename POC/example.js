@@ -39,8 +39,7 @@ var SubExample = Privacy(class SubExample extends Example {
             yes: 'You can always see me!',
             ['static no']: "I didn't forget this either!",
             ['private field1']() {
-                console.log("Non-interferring masking is possible as well.");
-                console.log(`The old "field3" is still '${super['#'].field3}'!`);
+                console.log(`The old "field3" is '${super['#'].field3}'!`);
             }
         }
     }

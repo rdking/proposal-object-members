@@ -1,13 +1,15 @@
 var Privacy = require('../privacy.es6');
+var SoftProxy = require('../softproxy');
 
+var factory;
+var factoryInstance;
+var subFactory;
+var subFactoryInstance;
 describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
-    var factory;
-    var factoryInstance;
-    var subFactory;
-    var subFactoryInstance;
     describe("Object with default prototype", () => {
         describe("External access checks", () => {
             test("Class definition with 'private' and/or 'protected' members does not fail", () => {
+                console.log("Defining Factory....");
                 factory = Privacy(class Factory extends Privacy.wrap(Object) {
                     static [Privacy.DATA]() {
                         return {
@@ -156,6 +158,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
     describe("Object with other object having private members as prototype", () => {
         describe("External access checks", () => {
             test("Object definition inheriting object with 'private' and 'protected' members does not fail", () => {
+                console.log("Defining SubFactory....");
                 subFactory = Privacy(class SubFactory extends factory {
                     static [Privacy.DATA]() {
                         return {
@@ -236,7 +239,8 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
             test("Should be able to construct an instance of a factory", () => {
                 expect(() => { subFactoryInstance = new subFactory(); }).not.toThrow();
                 expect(subFactoryInstance instanceof subFactory).toBeTruthy();
-                expect(subFactoryInstance instanceof factory).toBeTruthy();
+                debugger;
+                expect(SoftProxy.unwrap(factory.prototype).isPrototypeOf(subFactoryInstance)).toBeTruthy();
             });
 
             test("Operator '#' should not be available from outside", () => {

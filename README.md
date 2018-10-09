@@ -155,44 +155,75 @@ class Example {
   static private field2 = 0;
   protected field3 = '42';
   static protected field4 = "You can see me!";
+  field5 = "Just because...";
   
   print() {
     console.log(`field1 = ${this.field1}`);
-    console.log(`field2 = ${this.constructor#.field2}`);
-    console.log(`field3 = ${this['field3']}`); //Yes, obj#.x === obj#['x']
-    console.log(`field4 = ${this.constructor#.field4}`);
+    console.log(`field2 = ${this.constructor.field2}`);
+    console.log(`field3 = ${this['field3']}`);
+    console.log(`field4 = ${this.constructor.field4}`);
+    console.log(`field5 = ${this.field5}`);
   }
 }
 ```
 
-Loosely Translated to ES6:
-```javascript
-//See the POC folder for details on this library
-var Privacy = require("privacy.es6");
+Translated to ES6:
+```js
+var Example = (function() {
+  var pvt = new WeakMap();
+  class Example{ 
+    constructor() {
+      pvt.set(this, {
+        field1: 'alpha',
+        field3: '42'
+      });
 
-let Example = Privacy(class Example {
-  static Privacy[DATA]() {
-    return {
-      ['private field1']: 'alpha',
-      ['static private field2']: 0,
-      ['protected field3']: '42',
-      ['static protected field4']: "You can see me!"
-    };
-  }
+      //Are we building something that extends Example?
+      if (new.target !== this.constructor) {
+        this[this.constructor.inheritance] = pvt.get(this.constructor.prototype);
+      }
+    }
   
-  print() {
-    console.log(`field1 = ${this['#'].field1}`);
-    console.log(`field2 = ${this.constructor['#'].field2}`);
-    console.log(`field3 = ${this['#']['field3']}`); //Yes, obj#.x === obj#['x']
-    console.log(`field4 = ${this.constructor['#'].field4}`);
+    print() {
+      if (!pvt.has(this)) {
+        throw new TypeError("Invalid context object");
+      }
+      if (!pvt.has(this.constructor)) {
+        throw new TypeError("Invalid context object");
+      }
+      var p = pvt.get(this);
+      var fp = pvt.get(this.constructor);
+      console.log(`field1 = ${p.field1}`);
+      console.log(`field2 = ${fp.field2}`);
+      console.log(`field3 = ${p['field3']}`);
+      console.log(`field4 = ${fp.field4}`);
+      console.log(`field5 = ${this.field5}`);
+    }
   }
-})
+
+  //Static Private fields
+  pvt.set(Example, {
+    field2: 0,
+    field4: "You can see me"
+  });
+
+  //Protected fields
+  pvt.set(Example.prototype, {
+    staticFields: [ "field4" ],
+    get field2() { return pvt.get(this).field2; },
+    get field4() { return pvt.get(Example).field4; }
+  });
+
+  Object.defineProperty(Example, "inheritance", { value: Symbol() });
+
+  return Example;
+})();
 ```
 
 If we were to inherit from the example above:
 ```javascript
 class SubExample extends Example {
-  private field5 = "Hello from the SubExample!";
+  private field6 = "Hello from the SubExample!";
   
   constructor() {
     super();
@@ -200,13 +231,35 @@ class SubExample extends Example {
   
   print() {
     super.print();
-    console.log(`field5 = ${this#.field5}`);
+    console.log(`field6 = ${this.field6}`);
   }
 }
 ```
-it might roughly translate to the following:
+it might translate to the following:
 ```javascript
-let SubExample = Privacy(class SubExample extends Example {
+var SubExample = (function () {
+  var pvt = new WeakMap();
+
+  class SubExample extends Example {
+    constructor() {
+      super();
+  
+      var inheritance = Object.prototype;
+      if (this[Example.inheritance]) {
+        inheritance = {};
+        
+        for (let key in this[Example.inheritance]) {
+          if (s)
+        }
+      }
+      pvt.set(this, {
+        field6: "Hello from the SubExample!";
+      });
+    }
+  }
+})();
+
+Privacy(class SubExample extends Example {
   static Privacy[DATA]() {
     return {
         ['private field5']: "Hello from the SubExample!"

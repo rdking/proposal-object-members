@@ -171,7 +171,7 @@ See [**Implementation details...**](https://github.com/rdking/proposal-object-me
 The `private` keyword declares members in much the same way as you would expect if you were implementing `private` data using a `WeakMap`. The `private` keyword will provide a simple means of implementing a "hard-private" interface. Nothing outside the declaring object will ever have access to any member declared `private` unless the declaring object provides for such. 
 
 #### The `protected` keyword
-The `protected` keyword declares members that are "soft-private" so as to allow them to be shared with inheriting objects. Because of the "soft-privacy" of `protected`, **_nothing declared as such should be considered as private information_**. ES is a dynamic language making privacy an all or nothing situation. What `protected` instead offers is API separation. By declaring fields as `protected` those fields will not appear on the public interface of the object. Instead, they will appear as public members of the object's `private` interface. In this way, methods declared in both the declaring object and other objects using the declaring object as a prototype will be able to access these members.
+The `protected` keyword declares members that are "soft-private" so as to allow them to be shared with inheriting objects. Because of the "soft-privacy" of `protected`, **_nothing declared as such should be considered as private information_**. What `protected` offers is API separation. By declaring fields as `protected` those fields will not appear as own properties of the object. Instead, they will appear as shared members of the object's `private` interface. In this way, methods declared in both the declaring object and other objects using the declaring object as a prototype will be able to access these members.
 
 The examples below should make the usage of both `private` and `protected` clear.
 
@@ -252,7 +252,7 @@ let SubExample = Privacy(class SubExample extends Example {
 ```
 
 ## Privileges for object declarations...
-The addition of `class` keyword also brought the `Reflect` API with it, ensuring that those who have the desire to avoid using the `class` keyword can do so without issue. It is the intention of this proposal that this ability be maintained even though the addition of privilege levels. This is done by allowing the new tokens (`private`, `protected`, & `#`) to be used in object literal declarations as shown in the notation example above. Because any member declared `private` or `protected` will not be publicly accessible on the object instance, any object containing such members must also contain 1 or more functions which, taken together, access all `private` and `protected` members. These functions must be declared within the scope of the object literal declaration.
+Both `private` and `protected` will be supported for object declarations. This allows object factories to also make use of non-public data and API without the risk of memory leaks often inherent in closure-based APIs. Inheritance via setting the `__proto__` of an object will cause the instance to inherit the protected members of the parent object.
 
 ## Mutations to objects...
 Any function added to an object literal or a `class` prototype after the declaration will not have access to the `private` and `protected` members of the object literal or `class`. The reason for this can be seen by looking at the translated code in [**The `private` and `protected` keywords...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#the-private-and-protected-keywords) section above. The result of a `private` or `protected` declaration is a `Symbol` that only exists within the scope of the corresponding object literal or `class` declaration. Functions declared later will not have access to these `Symbols`. Also, since these `Symbols` are not themselves part of the object literal or `class` declaration, there is no means of retrieving these `Symbols` via any object literal, `class` constructor, or `class` prototype.
@@ -276,10 +276,7 @@ Access checks are performed by searching for matching records in the `[[Declarat
 When using the `class` keyword to create an object factory, all non-`static` members that are declared either `private` or `protected` are applied to the prototype. Members that are declared both `static` and either `private` or `protected` are treated as though they are `static` members of the function's own lexical scope. This allows such members to be applied to the afore mentioned slots of the function object itself.
 
 ## The odd bits...
-There will be those who strongly disagree with the use of the `private` keyword without access notation that looks like `obj.field`. To them I say, "I agree. It doesn't feel quite right having that extra character in there." At the same time, I recognize that this is ES, which is a very different language than the ones from which we're borrowing the `class` concept. As such, we should be willing to expect some _reasonable_ concessions. I would rather concede the extra `#` in `obj#.field` for rational reasons like the need to not have private implementation details interfere with public interface mutation, than concede `private` in `private field` for emotional reasons like "it doesn't feel right".
-ƒƒƒ
-Besides, the use of WeakMaps for providing private data is already a well known use case. Those of us implementing such an approach are already aware that the private data exists in a separate object. As such, the mental model for the new syntax is quite simple: `obj#.field <-> [[WeakMap]].get(obj).field`. The internal reality will not be too different:
-`obj#.field <-> obj.[[PrivateValues]][obj.[[DeclarationInfo]].field]`. The same mapping will hold true for array notation (`[]`) as well.
+There will be those who strongly disagree with the use of the `private` keyword without access notation that looks like `obj.field`. As long as it is understood that much like implementation of private data via a WeakMap, there is a separate private container only accessible using the `#` operator from within a method declared on the object, then access notation does indeed "look like" `obj.field` since `obj#` is the actual object being accessed.
 
 ## The gotchas...
 Because `obj#;` is a `SyntaxError`, there's no way to directly get at the private container. As such, the following things just won't work over private members:
@@ -287,5 +284,3 @@ Because `obj#;` is a `SyntaxError`, there's no way to directly get at the privat
 * Destructuring 
 * Iteration
 * Anything else that would require direct access to the private container
-
-

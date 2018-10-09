@@ -239,8 +239,7 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Classes", () => {
             test("Should be able to construct an instance of a factory", () => {
                 expect(() => { subFactoryInstance = new subFactory(); }).not.toThrow();
                 expect(subFactoryInstance instanceof subFactory).toBeTruthy();
-                debugger;
-                expect(SoftProxy.unwrap(factory.prototype).isPrototypeOf(subFactoryInstance)).toBeTruthy();
+                expect(factory.prototype.isPrototypeOf(subFactoryInstance)).toBeTruthy();
             });
 
             test("Operator '#' should not be available from outside", () => {

@@ -171,16 +171,38 @@ Translated to ES6:
 ```js
 var Example = (function() {
   var pvt = new WeakMap();
-  class Example{ 
-    constructor() {
-      pvt.set(this, {
-        field1: 'alpha',
-        field3: '42'
-      });
 
-      //Are we building something that extends Example?
-      if (new.target !== this.constructor) {
-        this[this.constructor.inheritance] = pvt.get(this.constructor.prototype);
+  /**
+   * Puts the non-private static members of this class on a derived class.
+   * @param {Symbol} flag - Should be <classname>.inheritance.
+   * @param {function} subClass - Should be the derived class being created.
+   * @returns {boolean} - a true/false flag telling whether or not derived
+   * class creation was detected.
+   */
+  function isStaticInheritance(flag, subClass) {
+    var retval = false;
+    if ((flag === Example.inheritance) &&
+        (typeof(subClass) == "function") &&
+        (subClass.prototype instanceof Example)) {
+      subClass[Example.inheritance] = pvt.get(Example.prototype).static;
+      retval = true;
+    }
+    return retval;
+  }
+
+  class Example { 
+    constructor() {
+      //If a derived class was just created, don't bother initializing the instance.
+      if (!((arguments.length === 2) && isStaticInheritance.apply(null, arguments))) {
+        //Are we building something that extends Example?
+        if (new.target !== this.constructor) {
+          this[this.constructor.inheritance] = pvt.get(this.constructor.prototype);
+        }
+
+        pvt.set(this, {
+          field1: 'alpha',
+          field3: '42'
+        });
       }
     }
   
@@ -209,9 +231,12 @@ var Example = (function() {
 
   //Protected fields
   pvt.set(Example.prototype, {
-    staticFields: [ "field4" ],
-    get field2() { return pvt.get(this).field2; },
-    get field4() { return pvt.get(Example).field4; }
+    static: {
+      get field4() { return pvt.get(Example).field4; }
+    },
+    nonStatic: {
+      get field3() { return pvt.get(this).field3; }
+    }
   });
 
   Object.defineProperty(Example, "inheritance", { value: Symbol() });
@@ -231,7 +256,7 @@ class SubExample extends Example {
   
   print() {
     super.print();
-    console.log(`field6 = ${this.field6}`);
+    console.log(`field5 = ${this.field6}`);
   }
 }
 ```
@@ -240,41 +265,88 @@ it might translate to the following:
 var SubExample = (function () {
   var pvt = new WeakMap();
 
+  /**
+   * Puts the non-private static members of this class on a derived class.
+   * @param {Symbol} flag - Should be <classname>.inheritance.
+   * @param {function} subClass - Should be the derived class being created.
+   * @returns {boolean} - a true/false flag telling whether or not derived
+   * class creation was detected.
+   */
+  function isStaticInheritance(flag, subClass) {
+    var retval = false;
+    if ((flag === Example.inheritance) &&
+        (typeof(subClass) == "function") &&
+        (subClass.prototype instanceof Example)) {
+      subClass[Example.inheritance] = pvt.get(Example.prototype).static;
+      retval = true;
+    }
+    return retval;
+  }
+
+  /**
+   * Migrates inheritance from base into the prototype of container.
+   * @param {object} obj - the object hosting the inheritance data.
+   * @param {function} base - the constructor of the base class.
+   * @param {object} container - the private container for this class.
+   * @param {boolean} wantStatic - a flag to determine which fields to inherit.
+   */
+  function getInheritance(obj, base, container, wantStatic) {
+    if (obj[base.inheritance]) {
+      let group = (!!wantStatic) ? 'static' : 'nonStatic';
+      let inheritable = obj[base.inheritance][group];
+      let inheritKeys = Object.getOwnPropertyNames(inheritable);
+
+      //Copy the inheritables into our inheritance.
+      for (let key of inheritKeys) {
+        Object.defineProperty(container, key, Object.getOwnPropertyDescriptor(inheritable, key));
+      }
+      
+      if (!wantStatic)
+        delete obj[base.inheritance];
+    }
+
+    return container;
+  }
+
   class SubExample extends Example {
     constructor() {
-      super();
-  
-      var inheritance = Object.prototype;
-      if (this[Example.inheritance]) {
-        inheritance = {};
-        
-        for (let key in this[Example.inheritance]) {
-          if (s)
-        }
+      //If a derived class was just created, don't bother initializing the instance.
+      if (!((arguments.length === 2) && isStaticInheritance.apply(null, arguments))) {
+        super();
+    
+        //Check for an inheritance 
+        pvt.set(this, getInheritance(this, Example, {
+          field6: "Hello from the SubExample!"
+        }));
       }
-      pvt.set(this, {
-        field6: "Hello from the SubExample!";
-      });
+    }
+  
+    print() {
+      if (!pvt.has(this)) {
+        throw new TypeError("Invalid context object");
+      }
+      var p = pvt.get(this);
+      super.print();
+      console.log(`field6 = ${p.field6}`);
     }
   }
-})();
 
-Privacy(class SubExample extends Example {
-  static Privacy[DATA]() {
-    return {
-        ['private field5']: "Hello from the SubExample!"
-      };
-    }
+  //Initialize SubExample with fields inherited from Example.
+  new Example(Example.inheritance, SubExample);
   
-  constructor() {
-    super();
-  }
-  
-  print() {
-    super.print();
-    console.log(`field5 = ${this['#'].field5}`);
-  }
-});
+  //Static Private fields
+  pvt.set(SubExample, getInheritance(SubExample, Example, {}, true));
+
+  //Protected fields
+  pvt.set(Example.prototype, {
+    static: getInheritance(SubExample, Example, {}, true),
+    nonStatic: getInheritance(SubExample, Example, {}, false)
+  });
+
+  Object.defineProperty(SubExample, "inheritance", { value: Symbol() });
+
+  return SubExample;
+})();
 ```
 
 ## Privileges for object declarations...

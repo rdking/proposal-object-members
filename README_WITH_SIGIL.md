@@ -2,20 +2,20 @@
 
 ## Goal
 
-This proposal is to provide functional support for access modifiers on object memmbers, namely `private`, `protected`, & `public` to ES. Use of `static` with and without access modifiers is to be supported for function objects. The end result will be lexical declaration syntax for:
+This proposal is to provide functional support for access modifiers on object memmbers, namely `private`, `protected`, & `public`, as well as a "private container access operator" (`#`) to ES. Support for `static` in conjunction with access modifiers is to be supported for function objects. The end result will be lexical declaration syntax for:
 
 * Fully encapsulated, hard-private fields accessible from an object
 * Soft-private fields accessible from an object or its descendants
 * Static fields at any access level accessible from a function object
 
-Under this version of the proposal, encapsulation requires inaccessibility, but does not include undetectability. For a proposal that includes undetectability, see [README_WITH_SIGIL](./README_WITH_SIGIL.md).
-
 ## Rationale
-Adding access levels to ES will provide developers with a clear, direct, and easy to understand means of modeling objects and their APIs using an approach familiar from other languages. The general idea is to add access modifiers for use in object definitions. This means that `class` will naturally inherit use of the modifiers since it is just a tokenization of a well known, often used pattern.Basing this paradigm on objects allows the feature to be used in both handwritten object factories and classes. The following should be understood when reading this proposal:
+Adding access levels to ES will provide developers with a clear, direct, and easy to understand means of modeling objects and their APIs using an approach familiar from other languages. Basing this paradigm on objects allows the feature to be used in both handwritten object factories and classes. The following should be understood when reading this proposal:
 
-* **`private`** - full encapsulation. Only accessible from the declaring object's lexically included methods. Not an "ownProperty" of the declaring object.
-* **`protected`** - accessible from the declaring object's lexically included methods, and any object for which the declaring object is a prototype. Not an "own property" of the declaring object.
-* **`public`** - accessible in any scope from which the declaring object is also accessible.
+* **`private`** - full encapsulation. Only accessible from declaring object's lexically included methods. Not an "ownProperty" of the object.
+* **`protected`** - accessible via lexically included methods of the declaring object and its descendants. Not an "ownProperty" of the object.
+* **`public`** - the default for any field added to any object.
+
+The only reason `public` will be implemented is because unlike normal objects, a function's lexical scope (closure) is `private` by default. Declaring a public function having access to privileged fields on a function object without constantly re-declaring the function member requires that there be a means to do so lexically within the function closure that will only be processed once. Hence, `public` will be allowed for variable declarations within a function, but only when paired with `static`. Beyond this singular use case, `public` serves no purpose.
 
 ## Existing proposals
 This proposal covers ground in ES for which there are already existing proposals, namely:
@@ -38,33 +38,31 @@ This proposal has few problems of its own, but inherits several by being tied to
 #### Compared to proposal-class-fields...
 The sheer amount effort that has been put into the existing proposal is formidable. It would be ill-adivsed at best to ignore the amount of effort poured into it. However, the existing proposal is not without its issues.
 
-* The requirement for private field undetectability drove the need for a sigil as a means to hide private fields from namespace collisions with public fields applied later. However, the arguments raised in defense of the need for undetectability suffer from logical contradictions while examples of the problems that would benefit from undetectability do not fit the required scenario. See [issue #136](https://github.com/tc39/proposal-class-fields/issues/136).
-  
-  * This proposal does not require undetectability, and does not make use of a sigil.
-
 * The syntax, while ostensibly easy to understand is meeting with high resistance from many of those who are aware of and interested in affecting the proposal. See [issue #100](https://github.com/tc39/proposal-class-fields/issues/100).
 
-  * This proposal uses the well-known syntax and meanings for declaring fields with access levels keeping the learning curve small.
-  * This proposal uses the same access notation for public and non-public fields.
+  * This proposal uses the well-known syntax and meanings for declaring fields with access levels making the learning curve small.
+  * This proposal provides a single operator for accessing non-public fields. This keeps access simple, consistent, and as obvious as possible.
 
 * Attempts to understand the syntax of the existing proposal leads to mental model conflicts that are inherent to the use of the syntax itself. See [the FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#but-doesnt-giving-thisx-and-thisx-different-semantics-break-an-invariant-of-current-syntax), [issue #104](https://github.com/tc39/proposal-class-fields/issues/104#issuecomment-396623715), [issue #77](https://github.com/tc39/proposal-class-fields/issues/77#issuecomment-360974968).
+  * Instead of using the sigil in a way that always has 2 of 3 different meanings (declaration token, access operator, `[[IdentifierName]]` character), it will instead be used only as an access operator.
 
 * The syntax of the existing proposal limits the new features to `class` declarations despite ES being a prototype-based language as opposed to a class-based one. See [issue #77](https://github.com/tc39/proposal-class-fields/issues/77#issuecomment-361016935).
 
   * The access modifiers will be made available to object and function declarations.
+  * The `#` access operator will be made available to functions declared within an object literal declaration.
 
-* The existing proposal refuses to use the `private` keyword for fear that it "implies that access would be done with `this.x`" ([FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#why-arent-declarations-private-x)).
+* The existing proposal refuses to use the `private` keyword for fear that it "implies that access would be done with `this.x`" ([FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#why-arent-declarations-private-x)). This is despite the fact that you can [model encapsulation using WeakMaps](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#how-can-you-model-encapsulation-using-weakmaps), which also does not use a `this.x` notation.
 
   * Access modifier keywords will be used to define non-public fields.
-  * Access notation will become `obj.field`, exactly as expected
+  * Access notation will become `obj#.field` for non-public fields, maintaining some semblance of the `obj.field` expectation since `obj#` retrieves the private data record.
 
 * The syntax of the existing proposal breaks the common equality `this.x === this['x']` for private fields due to the fact that the `#` sigil is part of the `[[IdentifierName]]` of the private field. See [the FAQ](https://github.com/tc39/proposal-class-fields/blob/master/PRIVATE_SYNTAX_FAQ.md#why-doesnt-thisx-access-the-private-field-named-x-given-that-thisx-does), [issue #74](https://github.com/tc39/proposal-class-fields/issues/74).
 
-  * Computed field access will retain the common equality for non-public fields.
+  * Computed field access has been restored such that `obj#.field === obj#['field']`.
 
 * The existing proposal lacks any concept of `protected`, making it difficult to share API that must not be accessible from the own properties of an object. See [issue #86](https://github.com/tc39/proposal-class-fields/issues/86).
 
-  * The `protected` keyword will be used to define a field that can be accessed by both the declaring object and other objects having the declaring object as a prototype.
+  * The `protected` keyword will be used to define a field that can be accessed by descendant `class` instances but is not an own property of the object.
 
 ## Notation
 The new syntax should be as follows:
@@ -104,8 +102,8 @@ The new syntax should be as follows:
 
 In essense, this proposal intends to allow:
 * field declarations in `class` definitions,
-* access modifiers in any object, or class declaration
-* access modifiers + `static` for any function-scoped variable declaration
+* access modifiers in any object or class declaration
+* access modifiers + `static` for any function-scoped `var` declaration
 
 ```js
 class Example {
@@ -124,29 +122,58 @@ function ExampleFn() {
   static field = 1; //`private` is default
   protected static field2 = 2;
   public static field = 3; //`public` allows exposing static fields
-  console.log(`last sum = ${ExampleFn.field1++ + ExampleFn.field2++}`);
-  console.log(`new sum = ${ExampleFn.field1 + ExampleFn.field2}`);
+  console.log(`last sum = ${ExampleFn#.field1++ + ExampleFn#.field2++}`);
+  console.log(`new sum = ${ExampleFn#.field1 + ExampleFn#.field2}`);
+}
+```
+This notation allows the function to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. While this feature is at first glance somewhat similar to the functionality of a generator, it is in fact very different, and a necessary feature for ensuring that fully featured constructor functions can still be generated without the help of the `class` keyword. See the [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) section for more information. 
+
+Access to such members can be made through the `#` operator with the owning `function` as the left parameter. Use of any access modifier keyword in this scope without the `static` keyword for a given variable declaration results in a `SyntaxError`. Since a closure is an inherently private space, the `private` keyword is not required when declaring a `private static` field. However, because this would leave no means of declaring a `public static` field, this becomes the one and only use case where `public` serves a function.
+
+Use of a single access modifier will not conflict with any other function modifiers. The `private` and `protected` keywords are meant to provide a access level to any and all possible forms of member variable, property, and function declaration that make sense within an object. Given the arguments that have led to [proposal-class-fields](https://github.com/tc39/proposal-class-fields), I propose that the access notation for both `private` and `protected` members be like this:
+
+```javascript
+class Example {
+  private privField1 = "value";
+  
+  constructor() {
+    console.log(`privField1 = ${this#.privField1}`);
+  }
+  
+  static print(obj) {
+    console.log(`privField1 = ${obj#["privField1"]}`);
+  }
 }
 ```
 
-The new static variable notation is a requirement that allows `class` definitions to have non-public static fields. As a side effect, this notation allows functions to maintain data that survives the collapse of its closure. Each invocation of such a function would then have access to the data stored in those static fields by a prior invocation. This feature may at first glance appear somewhat similar to the functionality of a generator. However, it differs in that no iterator is generated, and no closure is maintained. As a result, fully featured constructor functions can still be generated without the help of the `class` keyword. See the [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) section for more information. 
-
-Use of any access modifier keyword in this scope without the `static` keyword for a given variable declaration results in a `SyntaxError`. Since a closure is an inherently private space, the `private` keyword is not required when declaring a `private static` field. However, because this would leave no means of declaring a `public static` field, this becomes the one and only use case where `public` serves a function. Use of an access modifier will not conflict with any other function modifiers. The `private` and `protected` keywords are meant to provide an access level to any and all possible forms of member variable, property, and function declaration that make sense within an object. 
-
----
 ## How's this supposed to work?
+#### The private member container access operator(`#`)
+Other than the familiar declaration keywords, the only new thing is the `#`. As much as I hate to admit it, because of the comparatively peculiar way objects can be used in ES, to keep `private` members from being leaked, there must be a barrier between `public` members and `private` members. To this end, `#` will be a binary operator. The left term for this operator is the object from which we want to retrieve a `private` member. I didn't say "`private` or `protected` member" because `protected` members are just shared `private` members. More on that later. 
+
+The right term for the `#` operator **must be an access operator**. This is critical. At no point, and under no circumstances is the `#` operator ever allowed to be used as a unary postfix operator. Allowing this would invite both confusion and private scope leaks. Violating this is a `SyntaxError`. The only other rule is that the `#` operator cannot be used outside of an object or `class` declaration. Violating this rule is also a `SyntaxError`. This also means that it is a SyntaxError to put `private` fields on an object declaration without also declaring at least 1 function in that declaration that accesses it.
+
+In general, the rule for the `#` operator looks like this:
+
+`<lParam>#<rParam> === <lParam>.[[PrivateValues]][<lParam>.[[DeclarationInfo]]<rParam>]`
+
+Given code like `obj#.field`, ES should perform the following steps:
+1. Throw a type error if `obj` is not an object
+2. Let D be the `[[DeclarationInfo]]` record of `obj`.
+3. If D is not and is not in the `[[DeclarationInfo]]` of the current function object, throw a TypeError.
+4. Let N be the value for the key matching `field` in D, or undefined if no such key exists.
+5. Let P be the `[[PrivateValues]]` record of `obj`.
+6. If N is not a key of P, Throw a TypeError.
+7. Return P[N].
+
+See [**Implementation details...**](https://github.com/rdking/proposal-object-members/blob/master/README.md#implementation-details) for an explanation of the terms between the double braces (`[[ ]]`).
 
 #### The `private` keyword
-The `private` keyword declares members that are completely encapsulated in a scope that is public by default. This is done in much the same way as you would expect if you were implementing `private` data using a `WeakMap`. Nothing outside the declaring object will ever have access to any member declared `private` unless the declaring object provides for such. 
+The `private` keyword declares members in much the same way as you would expect if you were implementing `private` data using a `WeakMap`. The `private` keyword will provide a simple means of implementing a "hard-private" interface. Nothing outside the declaring object will ever have access to any member declared `private` unless the declaring object provides for such. 
 
 #### The `protected` keyword
-The `protected` keyword declares members that are encapsulated in a scope, much like with `private`. However,if the declaring object becomes the prototype of another object, the new object will be granted access to these members. I must be noted that **_nothing declared `protected` should be considered as private information_**. What `protected` offers instead is API separation. This allows a developer to cleanly separate the API meant to be used most commonly from the API meant to be used by those who wish to extend the API.
+The `protected` keyword declares members that are "soft-private" so as to allow them to be shared with inheriting objects. Because of the "soft-privacy" of `protected`, **_nothing declared as such should be considered as private information_**. What `protected` offers is API separation. By declaring fields as `protected` those fields will not appear as own properties of the object. Instead, they will appear as shared members of the object's `private` interface. In this way, methods declared in both the declaring object and other objects using the declaring object as a prototype will be able to access these members.
 
-#### The `public` keyword
-
-The `public` keyword declares members that are public in a scope that is private by default. As such, this keword is only useful in the context of a function. This allows a function to declare publicly accessible static members that live on the function itself. This capability, being inherited by the `class` keyword, is what gives rise to the ability to declare `class` static fields.
-
-The examples below should make the usage of `private`, `protected`, and `public` clear.
+The examples below should make the usage of both `private` and `protected` clear.
 
 With this proposal's syntax:
 ```javascript
@@ -155,100 +182,44 @@ class Example {
   static private field2 = 0;
   protected field3 = '42';
   static protected field4 = "You can see me!";
-  field5 = "Just because...";
   
   print() {
-    console.log(`field1 = ${this.field1}`);
-    console.log(`field2 = ${this.constructor.field2}`);
-    console.log(`field3 = ${this['field3']}`);
-    console.log(`field4 = ${this.constructor.field4}`);
-    console.log(`field5 = ${this.field5}`);
+    console.log(`field1 = ${this#.field1}`);
+    console.log(`field2 = ${this.constructor#.field2}`);
+    console.log(`field3 = ${this#['field3']}`); //Yes, obj#.x === obj#['x']
+    console.log(`field4 = ${this.constructor#.field4}`);
   }
 }
 ```
 
-Translated to ES6:
-```js
-var Example = (function() {
-  var pvt = new WeakMap();
+Loosely Translated to ES6:
+```javascript
+//See the POC folder for details on this library
+var Privacy = require("privacy.es6");
 
-  /**
-   * Puts the non-private static members of this class on a derived class.
-   * @param {Symbol} flag - Should be <classname>.inheritance.
-   * @param {function} subClass - Should be the derived class being created.
-   * @returns {boolean} - a true/false flag telling whether or not derived
-   * class creation was detected.
-   */
-  function isStaticInheritance(flag, subClass) {
-    var retval = false;
-    if ((flag === Example.inheritance) &&
-        (typeof(subClass) == "function") &&
-        (subClass.prototype instanceof Example)) {
-      subClass[Example.inheritance] = pvt.get(Example.prototype).static;
-      retval = true;
-    }
-    return retval;
+let Example = Privacy(class Example {
+  static Privacy[DATA]() {
+    return {
+      ['private field1']: 'alpha',
+      ['static private field2']: 0,
+      ['protected field3']: '42',
+      ['static protected field4']: "You can see me!"
+    };
   }
-
-  class Example { 
-    constructor() {
-      //If a derived class was just created, don't bother initializing the instance.
-      if (!((arguments.length === 2) && isStaticInheritance.apply(null, arguments))) {
-        //Are we building something that extends Example?
-        if (new.target !== this.constructor) {
-          this[this.constructor.inheritance] = pvt.get(this.constructor.prototype);
-        }
-
-        pvt.set(this, {
-          field1: 'alpha',
-          field3: '42'
-        });
-      }
-    }
   
-    print() {
-      if (!pvt.has(this)) {
-        throw new TypeError("Invalid context object");
-      }
-      if (!pvt.has(this.constructor)) {
-        throw new TypeError("Invalid context object");
-      }
-      var p = pvt.get(this);
-      var fp = pvt.get(this.constructor);
-      console.log(`field1 = ${p.field1}`);
-      console.log(`field2 = ${fp.field2}`);
-      console.log(`field3 = ${p['field3']}`);
-      console.log(`field4 = ${fp.field4}`);
-      console.log(`field5 = ${this.field5}`);
-    }
+  print() {
+    console.log(`field1 = ${this['#'].field1}`);
+    console.log(`field2 = ${this.constructor['#'].field2}`);
+    console.log(`field3 = ${this['#']['field3']}`); //Yes, obj#.x === obj#['x']
+    console.log(`field4 = ${this.constructor['#'].field4}`);
   }
-
-  //Static Private fields
-  pvt.set(Example, {
-    field2: 0,
-    field4: "You can see me"
-  });
-
-  //Protected fields
-  pvt.set(Example.prototype, {
-    static: {
-      get field4() { return pvt.get(Example).field4; }
-    },
-    nonStatic: {
-      get field3() { return pvt.get(this).field3; }
-    }
-  });
-
-  Object.defineProperty(Example, "inheritance", { value: Symbol() });
-
-  return Example;
-})();
+})
 ```
 
 If we were to inherit from the example above:
 ```javascript
 class SubExample extends Example {
-  private field6 = "Hello from the SubExample!";
+  private field5 = "Hello from the SubExample!";
   
   constructor() {
     super();
@@ -256,97 +227,28 @@ class SubExample extends Example {
   
   print() {
     super.print();
-    console.log(`field5 = ${this.field6}`);
+    console.log(`field5 = ${this#.field5}`);
   }
 }
 ```
-it might translate to the following:
+it might roughly translate to the following:
 ```javascript
-var SubExample = (function () {
-  var pvt = new WeakMap();
-
-  /**
-   * Puts the non-private static members of this class on a derived class.
-   * @param {Symbol} flag - Should be <classname>.inheritance.
-   * @param {function} subClass - Should be the derived class being created.
-   * @returns {boolean} - a true/false flag telling whether or not derived
-   * class creation was detected.
-   */
-  function isStaticInheritance(flag, subClass) {
-    var retval = false;
-    if ((flag === Example.inheritance) &&
-        (typeof(subClass) == "function") &&
-        (subClass.prototype instanceof Example)) {
-      subClass[Example.inheritance] = pvt.get(Example.prototype).static;
-      retval = true;
-    }
-    return retval;
-  }
-
-  /**
-   * Migrates inheritance from base into the prototype of container.
-   * @param {object} obj - the object hosting the inheritance data.
-   * @param {function} base - the constructor of the base class.
-   * @param {object} container - the private container for this class.
-   * @param {boolean} wantStatic - a flag to determine which fields to inherit.
-   */
-  function getInheritance(obj, base, container, wantStatic) {
-    if (obj[base.inheritance]) {
-      let group = (!!wantStatic) ? 'static' : 'nonStatic';
-      let inheritable = obj[base.inheritance][group];
-      let inheritKeys = Object.getOwnPropertyNames(inheritable);
-
-      //Copy the inheritables into our inheritance.
-      for (let key of inheritKeys) {
-        Object.defineProperty(container, key, Object.getOwnPropertyDescriptor(inheritable, key));
-      }
-      
-      if (!wantStatic)
-        delete obj[base.inheritance];
-    }
-
-    return container;
-  }
-
-  class SubExample extends Example {
-    constructor() {
-      //If a derived class was just created, don't bother initializing the instance.
-      if (!((arguments.length === 2) && isStaticInheritance.apply(null, arguments))) {
-        super();
-    
-        //Check for an inheritance 
-        pvt.set(this, getInheritance(this, Example, {
-          field6: "Hello from the SubExample!"
-        }));
-      }
+let SubExample = Privacy(class SubExample extends Example {
+  static Privacy[DATA]() {
+    return {
+        ['private field5']: "Hello from the SubExample!"
+      };
     }
   
-    print() {
-      if (!pvt.has(this)) {
-        throw new TypeError("Invalid context object");
-      }
-      var p = pvt.get(this);
-      super.print();
-      console.log(`field6 = ${p.field6}`);
-    }
+  constructor() {
+    super();
   }
-
-  //Initialize SubExample with fields inherited from Example.
-  new Example(Example.inheritance, SubExample);
   
-  //Static Private fields
-  pvt.set(SubExample, getInheritance(SubExample, Example, {}, true));
-
-  //Protected fields
-  pvt.set(Example.prototype, {
-    static: getInheritance(SubExample, Example, {}, true),
-    nonStatic: getInheritance(SubExample, Example, {}, false)
-  });
-
-  Object.defineProperty(SubExample, "inheritance", { value: Symbol() });
-
-  return SubExample;
-})();
+  print() {
+    super.print();
+    console.log(`field5 = ${this['#'].field5}`);
+  }
+});
 ```
 
 ## Privileges for object declarations...

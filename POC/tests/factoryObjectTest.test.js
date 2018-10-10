@@ -213,7 +213,8 @@ describe("Privacy - ES6 P.O.C for proposal-object-members: Object Members with c
             test("Should be able to construct an instance of a factory", () => {
                 expect(() => { subFactoryInstance = new subFactory(); }).not.toThrow();
                 expect(subFactoryInstance instanceof subFactory).toBeTruthy();
-                expect(subFactoryInstance instanceof factory).toBeTruthy();
+                expect(factory.prototype.isPrototypeOf(subFactoryInstance)).toBeTruthy();
+                //expect(subFactoryInstance instanceof factory).toBeTruthy();
             });
 
             test("Operator '#' should not be available from outside", () => {
